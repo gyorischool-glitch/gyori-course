@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>관리자 페이지</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<h2>관리자 페이지</h2>
+
+<!-- 로그아웃 & 학생용 화면 버튼 -->
+<button onclick="logout()">로그아웃</button>
+<button onclick="location.href='index.html'">학생용 화면</button>
+
+<h3>과목 관리</h3>
+<div>
+  <input type="text" id="newCourseName" placeholder="과목명">
+  <input type="number" id="newCourseMax" placeholder="정원">
+  <input type="text" id="newCourseGrade" placeholder="학년(쉼표로 구분)">
+  <input type="number" id="newCourseHours" placeholder="수업시간(시간)">
+  <button onclick="addCourse(
+    document.getElementById('newCourseName').value,
+    document.getElementById('newCourseMax').value,
+    document.getElementById('newCourseGrade').value.split(','),
+    document.getElementById('newCourseHours').value
+  )">과목 추가</button>
+</div>
+
+<h4>현재 등록된 과목</h4>
+<div id="courseListAdmin"></div>
+
+<h3>월별 출석부</h3>
+<select id="monthSelect"></select>
+<button onclick="generateMonthlyReport(document.getElementById('monthSelect').value)">출석부 생성</button>
+<div id="report"></div>
+
+<script>
+  for(let i=1;i<=12;i++){
+    monthSelect.innerHTML += `<option value="${i}">${i}월</option>`;
+  }
+</script>
+
+<script src="js/config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="js/script.js"></script>
+<script>
+  renderCourseListAdmin(); // 페이지 로드 시 과목 목록 표시
+</script>
+</body>
+</html>

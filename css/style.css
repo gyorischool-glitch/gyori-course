@@ -1,0 +1,6 @@
+body{ font-family: Arial; padding:20px; }
+h2,h3{ color: #2c3e50; }
+input, button{ margin:5px 0; padding:5px; }
+button{ cursor:pointer; }
+table{ border-collapse: collapse; margin-top:10px; }
+th,td{ padding:5px; border:1px solid #000; text-align:center; }

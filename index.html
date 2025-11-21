@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>교리초 수강신청</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<h2>학생 수강신청</h2>
+<form id="loginForm">
+  <label>학년: <input type="number" id="grade" min="1" max="6" required></label><br>
+  <label>반: <input type="text" id="class" placeholder="예: 가반" required></label><br>
+  <label>이름: <input type="text" id="name" required></label><br>
+  <button type="button" onclick="studentLogin(
+    document.getElementById('grade').value,
+    document.getElementById('class').value,
+    document.getElementById('name').value
+  )">확인</button>
+</form>
+
+<script src="js/config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="js/script.js"></script>
+</body>
+</html>
