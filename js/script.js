@@ -91,15 +91,24 @@ function renderCourseListAdmin(){
             const course = courses[id];
             const div = document.createElement("div");
             div.innerHTML = `
-                <strong>${course.name}</strong> (정원: ${course.maxStudents}, 학년: ${course.grade.join(", ")}, 시간: ${course.hours}h)
-                <button onclick="viewEditCourse('${id}')">상세보기/수정</button>
+                <strong>${course.name}</strong> 
+                <button onclick="viewCourse('${id}')">상세보기</button>
+                <button onclick="editCourse('${id}')">수정</button>
             `;
             listDiv.appendChild(div);
         }
+        populateCourseSelect(courses);
     });
 }
 
-function viewEditCourse(courseId){
+function viewCourse(courseId){
+    db.ref("courses/"+courseId).once("value").then(snapshot=>{
+        const course = snapshot.val();
+        alert(`과목명: ${course.name}\n정원: ${course.maxStudents}\n학년: ${course.grade.join(", ")}\n수업시간: ${course.hours}h`);
+    });
+}
+
+function editCourse(courseId){
     db.ref("courses/"+courseId).once("value").then(snapshot=>{
         const course = snapshot.val();
         const newName = prompt("과목명 수정:", course.name);
@@ -123,31 +132,41 @@ function viewEditCourse(courseId){
     });
 }
 
-/* =====================
-   관리자 월별 출석부
-===================== */
-function generateMonthlyReport(month){
-    db.ref("applications").once("value").then(snap=>{
-        const apps = snap.val();
-        const reportDiv = document.getElementById("report");
-        reportDiv.innerHTML = "<table border='1'><tr><th>학년</th><th>반</th><th>이름</th><th>과목</th><th>비고</th></tr>";
-        for(const appId in apps){
-            const app = apps[appId];
+// 월별 출석부 과목 선택 옵션
+function populateCourseSelect(courses){
+    const select = document.getElementById("courseSelect");
+    select.innerHTML = "";
+    for(const id in courses){
+        const option = document.createElement("option");
+        option.value = id;
+        option.text = courses[id].name;
+        select.appendChild(option);
+    }
+}
+
+// 과목별 월별 출석부 생성 + 엑셀 다운로드
+function generateCourseReport(month, courseId){
+    db.ref("applications").once("value").then(snapshot=>{
+        const apps = snapshot.val();
+        let data = [["학년","반","이름","과목","비고"]];
+        const filteredApps = Object.values(apps).filter(app=>{
             const date = new Date(app.timestamp);
-            if(date.getMonth()+1 == month){
-                db.ref("courses/"+app.courseId).once("value").then(csnap=>{
-                    const course = csnap.val();
-                    reportDiv.innerHTML += `<tr>
-                        <td>${app.grade}</td>
-                        <td>${app.class}</td>
-                        <td>${app.name}</td>
-                        <td>${course.name}</td>
-                        <td contenteditable="true"></td>
-                    </tr>`;
-                });
-            }
-        }
-        reportDiv.innerHTML += "</table>";
+            return date.getMonth()+1 == month && app.courseId === courseId;
+        });
+        if(filteredApps.length===0){ alert("해당 월에 신청자가 없습니다."); return; }
+
+        filteredApps.forEach(app=>{
+            db.ref("courses/"+app.courseId).once("value").then(csnap=>{
+                const course = csnap.val();
+                data.push([app.grade, app.class, app.name, course.name, ""]);
+                if(data.length-1 === filteredApps.length){
+                    const ws = XLSX.utils.aoa_to_sheet(data);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "출석부");
+                    XLSX.writeFile(wb, `${course.name}_${month}월_출석부.xlsx`);
+                }
+            });
+        });
     });
 }
 

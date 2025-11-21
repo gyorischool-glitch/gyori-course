@@ -9,7 +9,6 @@
 <body>
 <h2>관리자 페이지</h2>
 
-<!-- 로그아웃 & 학생용 화면 버튼 -->
 <button onclick="logout()">로그아웃</button>
 <button onclick="location.href='index.html'">학생용 화면</button>
 
@@ -32,7 +31,8 @@
 
 <h3>월별 출석부</h3>
 <select id="monthSelect"></select>
-<button onclick="generateMonthlyReport(document.getElementById('monthSelect').value)">출석부 생성</button>
+<select id="courseSelect"></select>
+<button onclick="generateCourseReport(document.getElementById('monthSelect').value, document.getElementById('courseSelect').value)">엑셀 출석부 생성</button>
 <div id="report"></div>
 
 <script>
