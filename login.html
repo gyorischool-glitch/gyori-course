@@ -1,27 +1,48 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>학생 로그인</title>
-<link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <title>학생 로그인 - 교리초 수강신청</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="card" style="max-width:480px;margin:20px auto;">
+        <h2>학생 로그인</h2>
+        <label>학년</label>
+        <input type="number" id="grade" placeholder="예: 3">
+        <label>반</label>
+        <input type="text" id="class" placeholder="예: 2 또는 사랑반">
+        <label>이름</label>
+        <input type="text" id="name" placeholder="학생 이름">
+        <label>연락처(선택)</label>
+        <input type="text" id="phone" placeholder="010-0000-0000">
 
-<h2>학생 로그인</h2>
+        <button onclick="studentLogin()" class="primary-btn" style="width:100%;margin-top:10px;">입장하기</button>
+    </div>
 
-<div class="card">
-    <input id="grade" type="number" min="1" max="6" placeholder="학년">
-    <input id="class" type="text" placeholder="반 (숫자 또는 한글)">
-    <input id="name" type="text" placeholder="이름">
-    <input id="phone" type="text" placeholder="연락처 (선택)">
-    <button onclick="studentLogin()">로그인</button>
-</div>
+    <script>
+    function studentLogin() {
+        var grade = document.getElementById('grade').value.trim();
+        var cls = document.getElementById('class').value.trim();
+        var name = document.getElementById('name').value.trim();
+        var phone = document.getElementById('phone').value.trim();
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<script src="config.js"></script>
-<script src="app.js"></script>
+        if (!grade || !cls || !name) {
+            alert('학년, 반, 이름을 모두 입력해주세요.');
+            return;
+        }
+
+        var student = {
+            uid: Date.now().toString(),
+            grade: grade,
+            class: cls,
+            name: name,
+            phone: phone
+        };
+        localStorage.setItem('studentUser', JSON.stringify(student));
+        location.href = 'index.html';
+    }
+    </script>
 </body>
 </html>

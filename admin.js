@@ -1,445 +1,230 @@
-/* ------------------------------------------
-   Firebase 초기화
-------------------------------------------- */
-const app = firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-const auth = firebase.auth();
-
-/* ------------------------------------------
-   페이지 초기 로딩
-------------------------------------------- */
-window.onload = () => {
-    showTab("programTab");
-    loadProgramList();
-    loadApplyProgramList();
-    loadWaitList();
-    loadStats();
-
-    // 자동승급 설정 불러오기
-    const auto = localStorage.getItem("autoPromote") === "1";
-    document.getElementById("autoPromote").checked = auto;
-};
-
-/* ------------------------------------------
-   탭 이동
-------------------------------------------- */
-function showTab(tab) {
-    document.querySelectorAll(".tab").forEach(t => t.classList.add("hidden"));
-    document.getElementById(tab).classList.remove("hidden");
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
 }
+const adb = firebase.database();
 
-/* ------------------------------------------
-   로그아웃
-------------------------------------------- */
-function logout() {
-    auth.signOut().then(() => {
-        alert("로그아웃 되었습니다.");
-        location.href = "admin-login.html";
+// 로그인 여부 확인
+function adminLogin() {
+    const pw = document.getElementById('adminPassword').value;
+    adb.ref('settings/adminPassword').once('value').then(snap => {
+        let real = snap.val();
+        if (!real) real = '1234'; // 기본 비밀번호
+        if (pw === real) {
+            localStorage.setItem('adminLoggedIn','true');
+            location.href = 'admin.html';
+        } else {
+            alert('비밀번호가 올바르지 않습니다.');
+        }
     });
 }
 
-/* ------------------------------------------
-   1. 프로그램 등록 기능
-------------------------------------------- */
-function addProgram() {
-    const name = p_name.value.trim();
-    const cap = Number(p_capacity.value);
-    const grades = Array.from(p_grade.selectedOptions).map(o => Number(o.value));
-    const day = p_day.value;
-    const start = p_startTime.value;
-    const end = p_endTime.value;
-    const teacher = p_teacher.value.trim();
-    const room = p_room.value.trim();
-    const desc = p_desc.value.trim();
+function checkAdminAuth() {
+    if (location.pathname.indexOf('admin.html') !== -1 ||
+        location.pathname.indexOf('admin-change-pw.html') !== -1) {
+        const ok = localStorage.getItem('adminLoggedIn') === 'true';
+        if (!ok) location.href = 'admin-login.html';
+    }
+}
+window.addEventListener('load', checkAdminAuth);
 
-    if (!name || !cap || !start || !end) {
-        alert("프로그램명, 정원, 시간은 반드시 입력해야 합니다.");
+// 기간 저장/불러오기
+function saveApplyPeriod() {
+    const start = document.getElementById('applyStart').value;
+    const end = document.getElementById('applyEnd').value;
+    if (!start || !end) {
+        alert('시작과 마감 날짜/시간을 모두 입력해주세요.');
+        return;
+    }
+    adb.ref('settings/applyPeriod').set({ start, end }).then(() => {
+        alert('수강신청 기간이 저장되었습니다.');
+        document.getElementById('applyPeriodMsg').textContent = `현재 설정: ${start} ~ ${end}`;
+    });
+}
+
+function loadApplyPeriod() {
+    const s = document.getElementById('applyStart');
+    const e = document.getElementById('applyEnd');
+    const msg = document.getElementById('applyPeriodMsg');
+    if (!s || !e) return;
+    adb.ref('settings/applyPeriod').once('value').then(snap => {
+        const val = snap.val();
+        if (val) {
+            s.value = val.start || '';
+            e.value = val.end || '';
+            if (msg) msg.textContent = `현재 설정: ${val.start} ~ ${val.end}`;
+        }
+    });
+}
+
+// 강좌 저장/수정
+function saveCourse() {
+    const id = document.getElementById('courseId').value;
+    const name = document.getElementById('courseName').value;
+    const day = document.getElementById('courseDay').value;
+    const st = document.getElementById('courseStartTime').value;
+    const et = document.getElementById('courseEndTime').value;
+    const limit = Number(document.getElementById('courseLimit').value || 0);
+    const hours = Number(document.getElementById('courseHours').value || 1);
+
+    if (!name || !day || !st || !et || !limit) {
+        alert('강좌명, 요일, 시간, 정원을 모두 입력해주세요.');
         return;
     }
 
-    const ref = db.ref("courses").push();
-    ref.set({
-        name,
-        limit: cap,
-        grade: grades,
-        day,
-        startTime: start,
-        endTime: end,
-        teacher,
-        room,
-        detail: desc
-    }).then(() => {
-        alert("프로그램이 등록되었습니다.");
-        resetProgramForm();
-        loadProgramList();
-        loadApplyProgramList();
-        loadWaitList();
-        loadStats();
+    const data = { name, day, startTime: st, endTime: et, limit, hours };
+
+    if (id) {
+        adb.ref('courses/' + id).update(data).then(() => {
+            alert('강좌가 수정되었습니다.');
+            autoUpgrade(id);
+            loadCourseList();
+            clearCourseForm();
+        });
+    } else {
+        const ref = adb.ref('courses').push();
+        ref.set(data).then(() => {
+            alert('강좌가 등록되었습니다.');
+            loadCourseList();
+            clearCourseForm();
+        });
+    }
+}
+
+function clearCourseForm() {
+    document.getElementById('courseId').value = '';
+    document.getElementById('courseName').value = '';
+    document.getElementById('courseDay').value = '';
+    document.getElementById('courseStartTime').value = '';
+    document.getElementById('courseEndTime').value = '';
+    document.getElementById('courseLimit').value = '';
+    document.getElementById('courseHours').value = '';
+}
+
+function loadCourseList() {
+    const tbody = document.getElementById('courseListBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6">불러오는 중...</td></tr>';
+    adb.ref('courses').once('value').then(snap => {
+        const courses = snap.val() || {};
+        tbody.innerHTML = '';
+        Object.keys(courses).forEach(id => {
+            const c = courses[id];
+            const appliedCount = c.applied ? Object.keys(c.applied).length : 0;
+            const waitCount = c.waitlist ? Object.keys(c.waitlist).length : 0;
+            const timeText = (c.startTime && c.endTime) ? `${c.startTime}~${c.endTime}` : '';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${c.name || ''}</td>
+                <td>${c.day || ''}</td>
+                <td>${timeText}</td>
+                <td>${c.limit || 0}</td>
+                <td>${appliedCount}/${waitCount}</td>
+                <td>
+                    <button class="btn-small btn-edit" onclick="editCourse('${id}')">수정</button>
+                    <button class="btn-small btn-del" onclick="deleteCourse('${id}')">삭제</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
     });
 }
 
-function resetProgramForm() {
-    programForm.reset();
-    Array.from(p_grade.options).forEach(o => o.selected = false);
+function editCourse(id) {
+    adb.ref('courses/' + id).once('value').then(snap => {
+        const c = snap.val();
+        document.getElementById('courseId').value = id;
+        document.getElementById('courseName').value = c.name || '';
+        document.getElementById('courseDay').value = c.day || '';
+        document.getElementById('courseStartTime').value = c.startTime || '';
+        document.getElementById('courseEndTime').value = c.endTime || '';
+        document.getElementById('courseLimit').value = c.limit || '';
+        document.getElementById('courseHours').value = c.hours || '';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
 }
 
-/* ------------------------------------------
-   1-2. 등록된 프로그램 목록
-------------------------------------------- */
-function loadProgramList() {
-    const box = document.getElementById("programList");
-    box.innerHTML = "";
+function deleteCourse(id) {
+    if (!confirm('이 강좌를 삭제할까요?')) return;
+    adb.ref('courses/' + id).remove().then(() => {
+        alert('삭제되었습니다.');
+        loadCourseList();
+    });
+}
 
-    db.ref("courses").once("value").then(snap => {
-        if (!snap.exists()) {
-            box.innerHTML = "<p>등록된 프로그램이 없습니다.</p>";
-            return;
+// 정원 변경 시 대기자 자동 승급
+function autoUpgrade(courseId) {
+    adb.ref('courses/' + courseId).once('value').then(snap => {
+        const c = snap.val();
+        if (!c) return;
+        const limit = c.limit || 0;
+        const applied = c.applied ? { ...c.applied } : {};
+        let appliedCount = Object.keys(applied).length;
+        const wait = c.waitlist ? c.waitlist : {};
+
+        // 대기자 배열 (order 순)
+        const arr = Object.entries(wait).map(([uid, data]) => ({
+            uid,
+            name: data.name,
+            grade: data.grade,
+            class: data.class,
+            order: data.order || 9999
+        })).sort((a,b)=>a.order-b.order);
+
+        const updates = {};
+        for (const w of arr) {
+            if (appliedCount >= limit) break;
+            updates['applied/' + w.uid] = {
+                name: w.name,
+                grade: w.grade,
+                class: w.class
+            };
+            updates['waitlist/' + w.uid] = null;
+            appliedCount++;
         }
 
-        snap.forEach(c => {
-            const d = c.val();
-            const div = document.createElement("div");
-            div.className = "prog-item";
-
-            div.innerHTML = `
-                <strong>${d.name}</strong>  
-                <br>대상 학년: ${d.grade.join(", ")}  
-                <br>정원: ${d.limit}명  
-                <br>${d.day}요일 ${d.startTime}~${d.endTime}
-                <br>강사: ${d.teacher}, 장소: ${d.room}
-                <br>
-                <button onclick="editProgram('${c.key}')">수정</button>
-                <button onclick="deleteProgram('${c.key}')">삭제</button>
-                <button onclick="downloadCourseExcel('${c.key}')">엑셀다운로드</button>
-            `;
-
-            box.appendChild(div);
-        });
+        if (Object.keys(updates).length > 0) {
+            adb.ref('courses/' + courseId).update(updates);
+        }
     });
 }
 
-/* ------------------------------------------
-   1-3. 프로그램 수정
-------------------------------------------- */
-function editProgram(id) {
-    db.ref("courses/" + id).once("value").then(snap => {
-        const c = snap.val();
-        const name = prompt("프로그램명", c.name);
-        if (name === null) return;
-
-        const cap = prompt("정원", c.limit);
-        if (cap === null) return;
-
-        const teacher = prompt("강사명", c.teacher || "");
-        if (teacher === null) return;
-
-        const room = prompt("장소", c.room || "");
-        if (room === null) return;
-
-        db.ref("courses/" + id).update({
-            name,
-            limit: Number(cap),
-            teacher,
-            room
-        }).then(() => {
-            alert("수정되었습니다.");
-            loadProgramList();
-            loadApplyProgramList();
-            loadWaitList();
-            loadStats();
-        });
-    });
-}
-
-function deleteProgram(id) {
-    if (!confirm("삭제하면 신청자 정보도 모두 삭제됩니다.")) return;
-
-    db.ref("courses/" + id).remove().then(() => {
-        alert("삭제되었습니다.");
-        loadProgramList();
-        loadApplyProgramList();
-        loadWaitList();
-        loadStats();
-    });
-}
-
-/* ------------------------------------------
-   2. 신청자 관리
-------------------------------------------- */
-let currentCourseId = null;
-let currentApplyData = [];
-
-function loadApplyProgramList() {
-    const box = applyProgramList;
-    box.innerHTML = "";
-
-    db.ref("courses").once("value").then(snap => {
-        snap.forEach(c => {
-            const id = c.key;
-            const d = c.val();
-            const applied = d.applied ? Object.keys(d.applied).length : 0;
-
-            const div = document.createElement("div");
-            div.className = "prog-item";
-
-            div.innerHTML = `
-                <strong>${d.name}</strong>
-                (${applied}명 신청)
-                <button onclick="showApplicants('${id}')">보기</button>
-            `;
-
-            box.appendChild(div);
-        });
-    });
-}
-
-function showApplicants(id) {
-    currentCourseId = id;
-
-    db.ref("courses/" + id).once("value").then(snap => {
-        const c = snap.val();
-        const applied = c.applied || {};
-        currentApplyData = Object.values(applied);
-
-        renderApplicants(currentApplyData);
-    });
-}
-
-function renderApplicants(list) {
-    if (list.length === 0) {
-        applyDetail.innerHTML = "<p>신청자가 없습니다.</p>";
+// 관리자 비밀번호 변경
+function changeAdminPassword() {
+    const oldPw = document.getElementById('oldPw').value;
+    const newPw = document.getElementById('newPw').value;
+    if (!oldPw || !newPw) {
+        alert('현재 비밀번호와 새 비밀번호를 모두 입력해주세요.');
         return;
     }
-
-    let html = `
-        <table>
-        <tr><th>학년</th><th>반</th><th>이름</th><th>연락처</th><th>삭제</th></tr>
-    `;
-
-    list.forEach(s => {
-        html += `
-            <tr>
-                <td>${s.grade}</td>
-                <td>${s.class}</td>
-                <td>${s.name}</td>
-                <td>${s.phone || ""}</td>
-                <td><button onclick="removeStudent('${s.uid}')">삭제</button></td>
-            </tr>
-        `;
-    });
-
-    html += "</table>";
-    applyDetail.innerHTML = html;
-}
-
-/* 필터 */
-function applyFilter() {
-    let g = filterGrade.value;
-    let c = filterClass.value;
-    let n = filterName.value;
-
-    let arr = currentApplyData.filter(s => {
-        return (!g || s.grade == g) &&
-               (!c || s.class.includes(c)) &&
-               (!n || s.name.includes(n));
-    });
-
-    renderApplicants(arr);
-}
-
-function clearFilter() {
-    filterGrade.value = "";
-    filterClass.value = "";
-    filterName.value = "";
-    renderApplicants(currentApplyData);
-}
-
-function removeStudent(uid) {
-    if (!confirm("삭제하시겠습니까?")) return;
-
-    db.ref(`courses/${currentCourseId}/applied/${uid}`).remove().then(() => {
-        alert("삭제되었습니다.");
-        showApplicants(currentCourseId);
-        loadWaitList();
-        loadStats();
-    });
-}
-
-/* ------------------------------------------
-   3. 대기자 관리 + 자동 승급
-------------------------------------------- */
-function saveAutoPromote() {
-    const val = autoPromote.checked ? "1" : "0";
-    localStorage.setItem("autoPromote", val);
-}
-
-function loadWaitList() {
-    const box = waitList;
-    box.innerHTML = "";
-
-    db.ref("courses").once("value").then(snap => {
-        snap.forEach(c => {
-            const id = c.key;
-            const d = c.val();
-            const wait = d.waitlist || {};
-            const count = Object.keys(wait).length;
-            if (!count) return;
-
-            const div = document.createElement("div");
-            div.className = "prog-item";
-
-            div.innerHTML = `
-                <strong>${d.name}</strong> (대기자 ${count}명)
-                <button onclick="showWaitDetail('${id}')">보기</button>
-            `;
-
-            box.appendChild(div);
-        });
-    });
-}
-
-function showWaitDetail(id) {
-    db.ref(`courses/${id}/waitlist`).once("value").then(snap => {
-        if (!snap.exists()) {
-            alert("대기자 없음");
+    adb.ref('settings/adminPassword').once('value').then(snap => {
+        let real = snap.val();
+        if (!real) real = '1234';
+        if (oldPw !== real) {
+            alert('현재 비밀번호가 올바르지 않습니다.');
             return;
         }
-
-        let txt = "[대기자]\n";
-        snap.forEach(s => {
-            const d = s.val();
-            txt += `${d.grade}학년 ${d.class}반 ${d.name}\n`;
+        adb.ref('settings/adminPassword').set(newPw).then(()=>{
+            alert('비밀번호가 변경되었습니다.');
+            location.href = 'admin.html';
         });
-        alert(txt);
     });
 }
 
-/* 자동 승급 */
-function checkAutoPromote(courseId) {
-    const enabled = localStorage.getItem("autoPromote") === "1";
-    if (!enabled) return;
-
-    const ref = db.ref("courses/" + courseId);
-
-    ref.once("value").then(snap => {
-        const c = snap.val();
-        const limit = c.limit;
-        const applied = c.applied || {};
-        const wait = c.waitlist || {};
-
-        const appliedCount = Object.keys(applied).length;
-        const waitKeys = Object.keys(wait);
-
-        if (appliedCount < limit && waitKeys.length > 0) {
-            const uid = waitKeys[0];
-            const student = wait[uid];
-
-            const updates = {};
-            updates[`courses/${courseId}/applied/${uid}`] = student;
-            updates[`courses/${courseId}/waitlist/${uid}`] = null;
-
-            db.ref().update(updates).then(() => {
-                loadWaitList();
-                loadApplyProgramList();
-                loadStats();
-            });
-        }
-    });
+// 기타 이동/로그아웃
+function goStudent() {
+    location.href = 'index.html';
+}
+function goChangePw() {
+    location.href = 'admin-change-pw.html';
+}
+function adminLogout() {
+    localStorage.removeItem('adminLoggedIn');
+    location.href = 'admin-login.html';
 }
 
-/* ------------------------------------------
-   4. 엑셀 다운로드
-------------------------------------------- */
-function downloadCourseExcel(id) {
-    db.ref("courses/" + id).once("value").then(snap => {
-        const c = snap.val();
-
-        let rows = [
-            ["학년","반","이름","연락처","요일","시간","강사","장소"]
-        ];
-
-        const applied = c.applied || {};
-        for (let uid in applied) {
-            const s = applied[uid];
-            rows.push([
-                s.grade, s.class, s.name, s.phone || "",
-                c.day, `${c.startTime}~${c.endTime}`,
-                c.teacher, c.room
-            ]);
-        }
-
-        const ws = XLSX.utils.aoa_to_sheet(rows);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, c.name);
-        XLSX.writeFile(wb, `${c.name}_신청자.xlsx`);
-    });
-}
-
-function downloadExcelAll() {
-    db.ref("courses").once("value").then(snap => {
-        let rows = [["프로그램명","학년","반","이름","연락처"]];
-
-        snap.forEach(c => {
-            const d = c.val();
-            const applied = d.applied || {};
-            for (let uid in applied) {
-                const s = applied[uid];
-                rows.push([d.name, s.grade, s.class, s.name, s.phone || ""]);
-            }
-        });
-
-        const ws = XLSX.utils.aoa_to_sheet(rows);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "전체신청자");
-        XLSX.writeFile(wb, "전체_신청자.xlsx");
-    });
-}
-
-/* ------------------------------------------
-   5. 통계
-------------------------------------------- */
-function loadStats() {
-    const box = stats;
-    box.innerHTML = "불러오는 중...";
-
-    db.ref("courses").once("value").then(snap => {
-        let gradeCount = {};
-        let courseCount = {};
-        let ratioList = [];
-
-        snap.forEach(c => {
-            const d = c.val();
-            const applied = d.applied || {};
-            const appliedLen = Object.keys(applied).length;
-
-            // 학년별 계산
-            for (let uid in applied) {
-                let s = applied[uid];
-                gradeCount[s.grade] = (gradeCount[s.grade] || 0) + 1;
-            }
-
-            // 인기 과목
-            courseCount[d.name] = appliedLen;
-
-            // 정원 대비 비율
-            const ratio = d.limit ? ((appliedLen / d.limit) * 100).toFixed(1) : "0";
-            ratioList.push(`${d.name}: ${appliedLen}/${d.limit} (${ratio}%)`);
-        });
-
-        let html = "<h4>학년별 참여자수</h4><ul>";
-        Object.keys(gradeCount).forEach(g => html += `<li>${g}학년: ${gradeCount[g]}명</li>`);
-        html += "</ul>";
-
-        html += "<h4>인기 프로그램</h4><ul>";
-        Object.keys(courseCount)
-            .sort((a,b)=>courseCount[b]-courseCount[a])
-            .forEach(name => html += `<li>${name}: ${courseCount[name]}명</li>`);
-        html += "</ul>";
-
-        html += "<h4>정원 대비 비율</h4><ul>";
-        ratioList.forEach(r => html += `<li>${r}</li>`);
-        html += "</ul>";
-
-        box.innerHTML = html;
-    });
-}
+window.addEventListener('load', () => {
+    if (document.getElementById('courseListBody')) {
+        loadApplyPeriod();
+        loadCourseList();
+    }
+});
