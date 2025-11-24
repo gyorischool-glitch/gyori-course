@@ -1,4 +1,3 @@
-// Firebase 설정 (v8)
 var firebaseConfig = {
     apiKey: "AIzaSyBu7kqKSczk7-8CgsXRi4hCiTmPHpjeYU",
     authDomain: "gyori-course.firebaseapp.com",
@@ -9,4 +8,3 @@ var firebaseConfig = {
     appId: "1:1795767019982:web:033c8b088d69beb1474d9f",
     measurementId: "G-EZ1MF7LNPK"
 };
-firebase.initializeApp(firebaseConfig);
