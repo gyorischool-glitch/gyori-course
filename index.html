@@ -24,10 +24,51 @@
     <button onclick="showMyPage()">📝 내 수강 내역</button>
 </div>
 
-<!-- 강좌 목록 -->
+<!-- 강좌 목록 (테이블 UI) -->
 <div id="courseContainer" class="section hidden">
-    <h3>📖 신청 가능한 강좌</h3>
-    <div id="courseList"></div>
+
+    <h3 class="title">강좌신청 및 취소</h3>
+
+    <!-- 상단 고정 검색바 + 개설 강좌 수 -->
+    <div class="course-header">
+        <div class="course-count">
+            현재 개설된 강좌개수는 <span id="courseCount">0</span>건입니다
+        </div>
+
+        <div class="course-search">
+            <select id="searchField">
+                <option value="name">강좌명</option>
+                <option value="teacher">강사명</option>
+            </select>
+            <input type="text" id="searchKeyword" placeholder="검색어를 입력해주세요">
+            <button type="button" onclick="searchCourses()" class="search-btn">🔍 검색</button>
+        </div>
+    </div>
+
+    <!-- 강좌 표 -->
+    <div class="table-wrapper">
+        <table class="course-table">
+            <thead>
+                <tr>
+                    <th>
+                        <input type="checkbox" id="selectAllCourses" onclick="toggleAllCourses(this)">
+                    </th>
+                    <th>번호</th>
+                    <th>기간명</th>
+                    <th>강좌명</th>
+                    <th>강사명</th>
+                    <th>강좌기간</th>
+                    <th>수강료</th>
+                    <th>신청/정원</th>
+                    <th>대기/정원</th>
+                    <th>신청상태</th>
+                </tr>
+            </thead>
+            <tbody id="courseTableBody">
+                <!-- JS에서 채워짐 -->
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <!-- 마이페이지 -->
