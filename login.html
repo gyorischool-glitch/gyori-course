@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>학생 로그인</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h2>학생 로그인</h2>
+
+<div class="card">
+    <input id="grade" type="number" min="1" max="6" placeholder="학년">
+    <input id="class" type="text" placeholder="반 (숫자 또는 한글)">
+    <input id="name" type="text" placeholder="이름">
+    <input id="phone" type="text" placeholder="연락처 (선택)">
+    <button onclick="studentLogin()">로그인</button>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
