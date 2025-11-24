@@ -1,4 +1,4 @@
-// Firebase 설정 (v8용)
+// Firebase 설정 (v8)
 var firebaseConfig = {
     apiKey: "AIzaSyBu7kqKSczk7-8CgsXRi4hCiTmPHpjeYU",
     authDomain: "gyori-course.firebaseapp.com",
