@@ -1,17 +1,1 @@
-<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'>
-<title>학생 로그인</title><meta name='viewport' content='width=device-width, initial-scale=1.0'>
-</head><body>
-<h2>학생 로그인</h2>
-<input id='grade' placeholder='학년'><br>
-<input id='class' placeholder='반'><br>
-<input id='name' placeholder='이름'><br>
-<button onclick='go()'>입장</button>
-<script>
-function go(){
- let g=grade.value.trim(); let c=class.value.trim(); let n=name.value.trim();
- if(!g||!c||!n){alert('모두 입력');return;}
- localStorage.setItem('studentUser',JSON.stringify({grade:g,class:c,name:n,uid:Date.now()+''}));
- location.href='index.html';
-}
-</script>
-</body></html>
+<html><body>학생 로그인</body></html>

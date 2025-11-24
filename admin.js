@@ -1,4 +1,4 @@
-// 관리자 JS
+
 firebase.initializeApp(firebaseConfig);
 
 function adminLogin(){
@@ -12,12 +12,7 @@ function adminLogin(){
 function checkAdmin(){
  firebase.auth().onAuthStateChanged(u=>{
    if(!u) location.href='admin-login.html';
-   loadAdmin();
  });
-}
-
-function loadAdmin(){
- document.getElementById('adminArea').innerHTML='<h3>강좌관리</h3>';
 }
 
 function logoutAdmin(){

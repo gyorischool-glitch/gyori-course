@@ -1,3 +1,4 @@
+
 var firebaseConfig = {
     apiKey: "AIzaSyBu7kqKSczk7-8CgsXRi4hCiTmPHpjeYU",
     authDomain: "gyori-course.firebaseapp.com",
