@@ -9,6 +9,4 @@ var firebaseConfig = {
     appId: "1:1795767019982:web:033c8b088d69beb1474d9f",
     measurementId: "G-EZ1MF7LNPK"
 };
-
-// Firebase 초기화
 firebase.initializeApp(firebaseConfig);
