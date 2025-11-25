@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>학생 로그인 - 교리초 수강신청</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="top-bar">
+    <h1>교리초 수강신청</h1>
+    <nav>
+      <a href="admin-login.html" class="link-small">관리자 로그인</a>
+    </nav>
+  </header>
+
+  <main class="page-center">
+    <section class="card card-narrow">
+      <h2>학생 입장</h2>
+      <p class="hint">학년 / 반 / 이름을 입력하면 수강신청 화면으로 이동합니다.</p>
+
+      <label>학년</label>
+      <input type="number" id="grade" placeholder="예: 3" min="1" max="6" />
+
+      <label>반</label>
+      <input type="text" id="class" placeholder="예: 2 또는 사랑반" />
+
+      <label>이름</label>
+      <input type="text" id="name" placeholder="학생 이름" />
+
+      <label>연락처 (선택)</label>
+      <input type="text" id="phone" placeholder="010-0000-0000" />
+
+      <button class="btn primary full" onclick="studentLogin()">입장하기</button>
+    </section>
+  </main>
+
+  <script>
+    function studentLogin() {
+      const grade = document.getElementById("grade").value.trim();
+      const cls = document.getElementById("class").value.trim();
+      const name = document.getElementById("name").value.trim();
+      const phone = document.getElementById("phone").value.trim();
+
+      if (!grade || !cls || !name) {
+        alert("학년, 반, 이름을 모두 입력해주세요.");
+        return;
+      }
+
+      const student = {
+        uid: Date.now().toString(),
+        grade,
+        class: cls,
+        name,
+        phone,
+      };
+      localStorage.setItem("studentUser", JSON.stringify(student));
+      location.href = "index.html";
+    }
+  </script>
+</body>
+</html>

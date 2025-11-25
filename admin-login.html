@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>관리자 로그인</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<h2>관리자 로그인</h2>
+
+<div class="card">
+    <input type="email" id="adminEmail" placeholder="관리자 이메일">
+    <input type="password" id="adminPw" placeholder="비밀번호">
+    <button onclick="adminLogin()">로그인</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="config.js"></script>
+<script>
+function adminLogin() {
+    firebase.auth().signInWithEmailAndPassword(
+        adminEmail.value, adminPw.value
+    ).then(()=>{
+        location.href="admin.html";
+    }).catch(e=>alert("로그인 실패: " + e.message));
+}
+</script>
+
+</body>
+</html>
