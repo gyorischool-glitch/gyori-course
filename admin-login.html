@@ -1,11 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>관리자 로그인 - 교리초 수강신청</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+  <header class="top-bar">
+    <h1>관리자 로그인</h1>
+    <nav>
+      <a href="index.html" class="link-small">학생 화면으로</a>
+    </nav>
+  </header>
 
-<!DOCTYPE html><html><body>
-<h2>관리자 이메일 로그인</h2>
-<input id='email' placeholder='이메일'><br>
-<input id='pw' type='password' placeholder='비밀번호'><br>
-<button onclick='adminLogin()'>로그인</button>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="config.js"></script>
-<script src="admin.js"></script>
-</body></html>
+  <main class="page-center">
+    <section class="card card-narrow">
+      <h2>관리자 이메일 로그인</h2>
+      <label>이메일</label>
+      <input type="email" id="adminEmail" placeholder="kyoree2002@korea.kr" />
+      <label>비밀번호</label>
+      <input type="password" id="adminPw" placeholder="비밀번호" />
+
+      <button class="btn primary full" onclick="adminLogin()">로그인</button>
+      <p class="hint small">※ 이메일/비밀번호는 Firebase Authentication에서 관리됩니다.</p>
+    </section>
+  </main>
+
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="config.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
