@@ -1,124 +1,121 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>관리자 페이지 - 교리초 수강신청</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="admin.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 페이지</title>
+    <link rel="stylesheet" href="admin.css">
 </head>
 <body>
-  <header class="top-bar">
-    <h1>관리자 페이지</h1>
-    <nav>
-      <span id="adminUserLabel"></span>
-      <button class="btn small outline" onclick="goStudent()">학생 화면</button>
-      <button class="btn small" onclick="logoutAdmin()">로그아웃</button>
-    </nav>
-  </header>
 
-  <main class="content">
-    <section class="card">
-      <h2>📅 수강신청 기간 설정</h2>
-      <div class="grid-2">
-        <div>
-          <label>시작 날짜/시간</label>
-          <input type="datetime-local" id="applyStart" />
-        </div>
-        <div>
-          <label>마감 날짜/시간</label>
-          <input type="datetime-local" id="applyEnd" />
-        </div>
-      </div>
-      <button class="btn primary" onclick="saveApplyPeriod()">기간 저장</button>
-      <p id="applyPeriodMsg" class="hint"></p>
-    </section>
+<h2>📋 교리초 수강신청 관리자 페이지</h2>
 
-    <section class="card">
-      <h2>📘 강좌 등록/수정</h2>
-      <input type="hidden" id="courseId" />
-      <div class="grid-2">
-        <div>
-          <label>강좌명</label>
-          <input type="text" id="courseName" />
-        </div>
-        <div>
-          <label>대상 학년 (예: 3-4)</label>
-          <input type="text" id="courseGradeRange" placeholder="예: 3-4 (전체: 1-6)" />
-        </div>
-      </div>
-      <div class="grid-3">
-        <div>
-          <label>요일</label>
-          <input type="text" id="courseDay" placeholder="월, 화, 수..." />
-        </div>
-        <div>
-          <label>시작 시간</label>
-          <input type="time" id="courseStartTime" />
-        </div>
-        <div>
-          <label>종료 시간</label>
-          <input type="time" id="courseEndTime" />
-        </div>
-      </div>
-      <div class="grid-3">
-        <div>
-          <label>정원</label>
-          <input type="number" id="courseLimit" min="1" />
-        </div>
-        <div>
-          <label>수업 시간(시간)</label>
-          <input type="number" id="courseHours" min="1" />
-        </div>
-        <div>
-          <label>수업 기간 (예: 2025-03-02~2025-06-30)</label>
-          <input type="text" id="coursePeriod" />
-        </div>
-      </div>
-      <button class="btn primary" onclick="saveCourse()">강좌 저장</button>
-      <button class="btn outline" onclick="clearCourseForm()">새로 입력</button>
-    </section>
+<!-- 상단 메뉴 -->
+<div class="top-menu">
+    <button onclick="showTab('programTab')">📘 프로그램 등록/수정</button>
+    <button onclick="showTab('applyTab')">🧑‍🎓 신청자 관리</button>
+    <button onclick="showTab('waitTab')">⏳ 대기자 관리</button>
+    <button onclick="showTab('downloadTab')">⬇ 다운로드/통계</button>
+    <button onclick="logout()">로그아웃</button>
+</div>
 
-    <section class="card">
-      <h2>📋 강좌 목록</h2>
-      <div class="table-wrapper">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>강좌명</th>
-              <th>학년</th>
-              <th>요일</th>
-              <th>시간</th>
-              <th>정원</th>
-              <th>신청/대기</th>
-              <th>관리</th>
-            </tr>
-          </thead>
-          <tbody id="courseListBody"></tbody>
-        </table>
-      </div>
-    </section>
+<!-- 1. 프로그램 등록/수정 -->
+<div id="programTab" class="tab">
+    <h3>📘 프로그램 등록</h3>
 
-    <section class="card">
-      <h2>👨‍👩‍👧‍👦 신청자 / 대기자</h2>
-      <p id="selectedCourseTitle" class="highlight"></p>
-      <div class="grid-2">
-        <div>
-          <h3>신청자 목록</h3>
-          <ul id="appliedList" class="list"></ul>
-        </div>
-        <div>
-          <h3>대기자 목록</h3>
-          <ul id="waitList" class="list"></ul>
-        </div>
-      </div>
-      <button class="btn outline" onclick="downloadCourseCsv()">엑셀(CSV) 다운로드</button>
-    </section>
-  </main>
+    <form id="programForm" onsubmit="return false;">
+        <input type="text" id="p_name" placeholder="프로그램명">
 
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  <script src="config.js"></script>
-  <script src="admin.js"></script>
+        <input type="number" id="p_capacity" placeholder="정원">
+
+        <label>대상 학년</label>
+        <select id="p_grade" multiple>
+            <option value="1">1학년</option>
+            <option value="2">2학년</option>
+            <option value="3">3학년</option>
+            <option value="4">4학년</option>
+            <option value="5">5학년</option>
+            <option value="6">6학년</option>
+        </select>
+
+        <label>요일</label>
+        <select id="p_day">
+            <option value="월">월</option>
+            <option value="화">화</option>
+            <option value="수">수</option>
+            <option value="목">목</option>
+            <option value="금">금</option>
+        </select>
+
+        <label>수업 시작시간</label>
+        <input type="time" id="p_startTime">
+
+        <label>수업 종료시간</label>
+        <input type="time" id="p_endTime">
+
+        <input type="text" id="p_teacher" placeholder="강사명">
+
+        <input type="text" id="p_room" placeholder="장소">
+
+        <textarea id="p_desc" placeholder="프로그램 설명"></textarea>
+
+        <button onclick="addProgram()">등록</button>
+        <button onclick="resetProgramForm()">초기화</button>
+    </form>
+
+    <h3>📚 등록된 프로그램 목록</h3>
+    <div id="programList"></div>
+</div>
+
+<!-- 2. 신청자 관리 -->
+<div id="applyTab" class="tab hidden">
+    <h3>🧑‍🎓 강좌별 신청자 관리</h3>
+    <div id="applyProgramList"></div>
+
+    <h4>신청자 목록</h4>
+    <div class="filter-box">
+        <label>학년: <input type="number" id="filterGrade"></label>
+        <label>반: <input type="text" id="filterClass"></label>
+        <label>이름: <input type="text" id="filterName"></label>
+        <button onclick="applyFilter()">필터 적용</button>
+        <button onclick="clearFilter()">초기화</button>
+    </div>
+
+    <div id="applyDetail"></div>
+</div>
+
+<!-- 3. 대기자 관리 -->
+<div id="waitTab" class="tab hidden">
+    <h3>⏳ 대기자 관리</h3>
+
+    <div class="auto-box">
+        <label>
+            <input type="checkbox" id="autoPromote" onchange="saveAutoPromote()">
+            🔄 공석 발생 시 자동으로 대기자 승급시키기
+        </label>
+    </div>
+
+    <div id="waitList"></div>
+</div>
+
+<!-- 4. 다운로드/통계 -->
+<div id="downloadTab" class="tab hidden">
+    <h3>⬇ 전체 신청자 다운로드</h3>
+    <button onclick="downloadExcelAll()">전체 신청자 엑셀 다운로드</button>
+
+    <h3>📊 통계</h3>
+    <div id="stats"></div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
+
+<!-- SheetJS (엑셀용) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script src="config.js"></script>
+<script src="admin.js"></script>
 </body>
 </html>

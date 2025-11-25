@@ -1,149 +1,282 @@
-*{box-sizing:border-box;}
-body{
-  margin:0;
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  background:#f5f7fb;
-  color:#333;
+/* 공통 테마 */
+:root {
+    --primary: #5C6BC0;
+    --primary-dark: #3949AB;
+    --accent: #8E24AA;
+    --danger: #E53935;
+    --bg-main: #f5f7fb;
+    --text-main: #333;
 }
-.top-bar{
-  position:sticky;
-  top:0;
-  z-index:10;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:10px 14px;
-  background:#3949ab;
-  color:#fff;
-  box-shadow:0 2px 4px rgba(0,0,0,.1);
+
+/* 기본 */
+* { box-sizing: border-box; }
+
+body {
+    font-family: Arial, sans-serif;
+    padding: 10px;
+    margin: 0;
+    background: var(--bg-main);
+    color: var(--text-main);
 }
-.top-bar h1{
-  font-size:18px;
-  margin:0;
+
+h2, h3 {
+    text-align: center;
 }
-.top-bar nav{
-  display:flex;
-  gap:8px;
-  align-items:center;
+
+/* 카드 */
+.card {
+    background: #ffffff;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
 }
-.content{
-  padding:12px;
-  max-width:1100px;
-  margin:0 auto 40px;
+
+/* 메뉴 버튼 */
+.menu {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
 }
-.page-center{
-  min-height:calc(100vh - 60px);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:16px;
+.menu button {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    background: var(--primary);
+    color: white;
+    cursor: pointer;
 }
-.card{
-  background:#fff;
-  border-radius:12px;
-  padding:16px 18px;
-  box-shadow:0 2px 8px rgba(0,0,0,.06);
-  margin-bottom:14px;
+
+/* 강좌/마이페이지 섹션 */
+.section {
+    margin-top: 10px;
 }
-.card h2, .card h3{
-  margin-top:0;
+.hidden {
+    display: none;
 }
-.card-narrow{
-  max-width:420px;
-  width:100%;
+
+/* 내 수강 내역 리스트 */
+#myCourseList li {
+    margin: 5px 0;
 }
-label{
-  display:block;
-  font-size:13px;
-  margin-top:6px;
-  margin-bottom:2px;
-  font-weight:600;
+
+/* 토스트 팝업 */
+.toast-message {
+    position: fixed;
+    bottom: -60px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #4CAF50;
+    color: white;
+    padding: 14px 22px;
+    border-radius: 30px;
+    font-size: 16px;
+    opacity: 0;
+    transition: all 0.5s ease;
+    z-index: 9999;
 }
-input, select{
-  width:100%;
-  padding:8px;
-  border-radius:8px;
-  border:1px solid #cfd4e3;
-  font-size:14px;
-  margin-bottom:6px;
+.toast-message.show {
+    bottom: 40px;
+    opacity: 1;
 }
-.btn{
-  border:none;
-  border-radius:999px;
-  padding:7px 14px;
-  font-size:14px;
-  cursor:pointer;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap:4px;
+
+/* FullCalendar */
+#calendar {
+    margin-top: 20px;
 }
-.btn.primary{
-  background:#5c6bc0;
-  color:#fff;
+
+/* ============ 수강신청 테이블 스타일 (머티리얼 느낌) ============ */
+
+.title {
+    margin-top: 10px;
+    margin-bottom: 8px;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text-main);
 }
-.btn.outline{
-  background:#fff;
-  color:#5c6bc0;
-  border:1px solid #5c6bc0;
+
+/* 상단 고정 검색바 */
+.course-header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: white;
+    padding: 10px 8px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.06);
 }
-.btn.small{
-  padding:4px 10px;
-  font-size:12px;
+
+.course-count {
+    font-size: 14px;
+    color: #555;
 }
-.btn.full{
-  width:100%;
-  margin-top:8px;
+
+.course-search {
+    display: flex;
+    gap: 6px;
+    align-items: center;
 }
-.link-small{
-  color:#bbdefb;
-  font-size:12px;
-  text-decoration:none;
+
+.course-search select,
+.course-search input {
+    padding: 7px 10px;
+    font-size: 14px;
+    border: 1px solid #ccd3e0;
+    border-radius: 6px;
 }
-.link-small:hover{
-  text-decoration:underline;
+
+.search-btn {
+    padding: 7px 14px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
 }
-.hint{
-  font-size:13px;
-  color:#666;
+
+/* 표 + 카드 느낌 */
+.table-wrapper {
+    margin-top: 4px;
+    overflow-x: auto;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
 }
-.hint.small{
-  font-size:11px;
+
+.course-table {
+    width: 100%;
+    border-collapse: collapse;
 }
-.highlight{
-  font-size:14px;
-  font-weight:600;
-  color:#2e7d32;
+
+.course-table th,
+.course-table td {
+    padding: 8px 6px;
+    font-size: 13px;
+    border-bottom: 1px solid #edf0f5;
+    text-align: center;
 }
-.table-wrapper{
-  overflow-x:auto;
+
+.course-table thead th {
+    background: #f3f6fb;
+    font-weight: 600;
 }
-.table{
-  width:100%;
-  border-collapse:collapse;
-  font-size:13px;
+
+.course-table th:first-child,
+.course-table td:first-child {
+    width: 32px;
 }
-.table th,.table td{
-  padding:8px;
-  border-bottom:1px solid #e0e6f0;
-  text-align:center;
+
+/* 클릭 가능한 기간명/강좌명 */
+.clickable {
+    cursor: pointer;
+    color: var(--primary);
 }
-.table thead th{
-  background:#f3f6ff;
+.clickable:hover {
+    text-decoration: underline;
 }
-.list{
-  list-style:none;
-  padding-left:16px;
+
+/* 상태/버튼 */
+.course-status-btn {
+    padding: 5px 12px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-size: 12px;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
-.list li{
-  padding:3px 0;
-  border-bottom:1px dashed #eee;
-  font-size:13px;
+
+.cancel-btn {
+    padding: 4px 10px;
+    background: var(--danger);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-size: 12px;
+    cursor: pointer;
+    margin-top: 4px;
 }
-@media(max-width:768px){
-  .top-bar{
-    flex-direction:column;
-    align-items:flex-start;
-    gap:6px;
-  }
+
+.course-status-done {
+    color: #2e7d32;
+    font-weight: 600;
+}
+
+.course-status-full {
+    color: #c62828;
+    font-weight: 600;
+}
+
+.status-double {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+}
+
+/* 상세 팝업 */
+.popup-bg {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.35);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+}
+
+.popup-box {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 20px 18px;
+    width: 90%;
+    max-width: 420px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    text-align: left;
+}
+
+.popup-box h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.popup-box p {
+    margin: 4px 0;
+    font-size: 14px;
+}
+
+.popup-close {
+    display: inline-block;
+    margin-top: 14px;
+    padding: 7px 14px;
+    background: var(--primary-dark);
+    color: white;
+    border-radius: 20px;
+    cursor: pointer;
+    border: none;
+}
+
+/* 모바일 대응 */
+@media (max-width: 600px) {
+    .menu {
+        flex-direction: column;
+    }
+    .course-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .course-search {
+        width: 100%;
+    }
+    .course-search input {
+        flex: 1;
+    }
 }
