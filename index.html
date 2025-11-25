@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>교리초 수강신청 - 학생용</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="top-bar">
+    <h1>교리초 수강신청</h1>
+    <nav>
+      <span id="studentLabel"></span>
+      <button class="btn small" onclick="openMyPage()">마이페이지</button>
+      <button class="btn small outline" onclick="logout()">로그아웃</button>
+      <a href="admin-login.html" class="link-small">관리자</a>
+    </nav>
+  </header>
+
+  <main class="content">
+    <section class="card">
+      <h2>강좌 신청</h2>
+      <p id="applyStatusMsg" class="hint"></p>
+
+      <div class="table-wrapper">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>번호</th>
+              <th>강좌명</th>
+              <th>대상 학년</th>
+              <th>요일</th>
+              <th>시간</th>
+              <th>정원</th>
+              <th>신청/대기</th>
+              <th>신청</th>
+            </tr>
+          </thead>
+          <tbody id="courseTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="myPage" class="card" style="display:none;">
+      <h2>📘 마이페이지</h2>
+      <p id="totalHours" class="highlight"></p>
+
+      <h3>📚 신청한 과목</h3>
+      <ul id="myAppliedList" class="list"></ul>
+
+      <h3>⏳ 대기 중인 과목</h3>
+      <ul id="myWaitList" class="list"></ul>
+
+      <h3>🗓 월별 시간표</h3>
+      <select id="calendarMonth" onchange="loadMonthlySchedule()">
+        <option value="">월 선택</option>
+        <option value="1">1월</option>
+        <option value="2">2월</option>
+        <option value="3">3월</option>
+        <option value="4">4월</option>
+        <option value="5">5월</option>
+        <option value="6">6월</option>
+        <option value="7">7월</option>
+        <option value="8">8월</option>
+        <option value="9">9월</option>
+        <option value="10">10월</option>
+        <option value="11">11월</option>
+        <option value="12">12월</option>
+      </select>
+      <ul id="monthlySchedule" class="list"></ul>
+
+      <h3>📅 주간 시간표</h3>
+      <div id="weeklyTable"></div>
+
+      <h3>📆 수업 캘린더</h3>
+      <div id="calendarView"></div>
+
+      <button class="btn outline" onclick="closeMyPage()">마이페이지 닫기</button>
+    </section>
+  </main>
+
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
