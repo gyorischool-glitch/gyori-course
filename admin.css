@@ -252,3 +252,22 @@ table td {
         font-size: 11px;
     }
 }
+
+/* --- UI Upgrade (관리자용) --- */
+.table tbody tr:hover{
+  background:#eceff1;
+}
+.btn{
+  transition:background .2s, transform .1s, box-shadow .1s;
+  box-shadow:0 1px 3px rgba(0,0,0,.15);
+}
+.btn:active{
+  transform:scale(.97);
+  box-shadow:0 0 0 rgba(0,0,0,0);
+}
+.card h2{
+  font-size:18px;
+  border-bottom:1px solid #dde3ea;
+  padding-bottom:6px;
+  margin-bottom:10px;
+}

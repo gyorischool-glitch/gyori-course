@@ -461,3 +461,71 @@ function changePw(){
   .then(()=> alert("비밀번호가 변경되었습니다."))
   .catch(e=> alert("오류: "+e.message));
 }
+
+// 출석부 CSV 다운로드 (과목별, 월 선택)
+function downloadAttendanceCsv(){
+  if (!currentCourseId){
+    alert('먼저 강좌 목록에서 "신청자" 버튼을 눌러 강좌를 선택해 주세요.');
+    return;
+  }
+  var ym = prompt('출석부를 생성할 년-월을 입력하세요. 예: 2025-03');
+  if (!ym) return;
+  var parts = ym.split('-');
+  if (parts.length !== 2){
+    alert('형식이 올바르지 않습니다. 예: 2025-03');
+    return;
+  }
+  var year = parseInt(parts[0],10);
+  var month = parseInt(parts[1],10);
+  if (!year || !month || month < 1 || month > 12){
+    alert('년/월이 올바르지 않습니다.');
+    return;
+  }
+  adb.ref('courses/' + currentCourseId).once('value').then(function(snap){
+    var c = snap.val();
+    if (!c){
+      alert('강좌 정보를 찾을 수 없습니다.');
+      return;
+    }
+    var applied = c.applied || {};
+    var students = Object.values(applied).map(function(s, idx){
+      return {
+        no: idx + 1,
+        grade: s.grade,
+        class: s.class,
+        name: s.name
+      };
+    });
+    if (!students.length){
+      alert('신청자가 없어 출석부를 만들 수 없습니다.');
+      return;
+    }
+    // 월 마지막 일 계산
+    var lastDay = new Date(year, month, 0).getDate();
+    var rows = [];
+    var header = ['번호','학년','반','이름'];
+    for (var d=1; d<=lastDay; d++){
+      header.push(d + '일');
+    }
+    header.push('비고');
+    rows.push(header);
+    students.forEach(function(s){
+      var row = [s.no, s.grade, s.class, s.name];
+      for (var d=1; d<=lastDay; d++){
+        row.push('');
+      }
+      row.push('');
+      rows.push(row);
+    });
+    var csv = rows.map(function(r){ return r.join(','); }).join('\n');
+    var blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = (c.name || 'course') + '_' + ym + '_출석부.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+}
