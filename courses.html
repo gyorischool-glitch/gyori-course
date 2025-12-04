@@ -62,6 +62,48 @@ const tbody = document.querySelector('#courseTable tbody');
 
 let student = null;
 
+// ------------------------ 시간 파싱 기능 ------------------------
+
+// "월 3~4교시" → { day: "월", start: 3, end: 4 }
+function parseTimeStr(str) {
+  if (!str) return null;
+  const match = str.match(/([월화수목금토일])\s*(\d+)\s*~\s*(\d+)교시/);
+
+  if (!match) return null;
+
+  return {
+    day: match[1],
+    start: parseInt(match[2], 10),
+    end: parseInt(match[3], 10)
+  };
+}
+
+// 두 시간대가 겹치는지
+function isTimeConflict(t1, t2) {
+  if (!t1 || !t2) return false;
+  if (t1.day !== t2.day) return false;
+
+  return !(t1.end < t2.start || t2.end < t1.start);
+}
+
+// 학생이 이미 신청한 과목들의 시간대 리스트
+function getMyAppliedTimeList(courses, studentApplied) {
+  const list = [];
+
+  if (!courses || !studentApplied) return list;
+
+  Object.entries(studentApplied).forEach(([courseId, v]) => {
+    if (v && courses[courseId]) {
+      const t = parseTimeStr(courses[courseId].time);
+      if (t) list.push(t);
+    }
+  });
+
+  return list;
+}
+
+// ---------------------------------------------------------------
+
 // 학생 정보 로드
 function loadStudent() {
   const raw = localStorage.getItem('gyori_student');
@@ -74,19 +116,21 @@ function loadStudent() {
   studentInfoEl.textContent = `학년: ${student.grade} / 반: ${student.class} / 이름: ${student.name}`;
 }
 
+let allCoursesCache = {};
+let myAppliedCache = {};
+let myWaitingCache = {};
+
 // 과목 렌더링
 function renderCourses(courses, studentApplied, studentWaiting) {
   tbody.innerHTML = '';
   const gradeNum = parseInt(student.grade, 10);
 
   Object.entries(courses || {}).forEach(([id, c]) => {
-    // 학년 필터링
     const minG = parseInt(c.minGrade, 10);
     const maxG = parseInt(c.maxGrade, 10);
     if (!isNaN(minG) && !isNaN(maxG) && (gradeNum < minG || gradeNum > maxG)) return;
 
     const tr = document.createElement('tr');
-
     const appliedCount = c.appliedCount || 0;
     const capacity = c.capacity || 0;
     const isFull = capacity > 0 && appliedCount >= capacity;
@@ -131,7 +175,7 @@ function renderCourses(courses, studentApplied, studentWaiting) {
   });
 }
 
-// 과목+대기 데이터 감시
+// DB 감시
 function watchCourses() {
   if (!student) return;
 
@@ -140,15 +184,15 @@ function watchCourses() {
   const waitingRef = ref(db, 'courseWaitingByStudent/' + encodeURIComponent(student.name));
 
   onValue(coursesRef, (snapCourses) => {
-    const courses = snapCourses.val() || {};
+    allCoursesCache = snapCourses.val() || {};
 
     onValue(appliedRef, (snapApplied) => {
-      const myApplied = snapApplied.val() || {};
+      myAppliedCache = snapApplied.val() || {};
 
       onValue(waitingRef, (snapWaiting) => {
-        const myWaiting = snapWaiting.val() || {};
+        myWaitingCache = snapWaiting.val() || {};
 
-        renderCourses(courses, myApplied, myWaiting);
+        renderCourses(allCoursesCache, myAppliedCache, myWaitingCache);
       });
     });
   });
@@ -163,6 +207,19 @@ function applyCourse(courseId) {
   if (!student) return;
 
   msgEl.textContent = '';
+
+  // ---------------- 시간 중복 체크 ----------------
+  const myTimeList = getMyAppliedTimeList(allCoursesCache, myAppliedCache);
+  const newTime = parseTimeStr(allCoursesCache[courseId].time);
+
+  for (const t of myTimeList) {
+    if (isTimeConflict(t, newTime)) {
+      msgEl.textContent = '이미 같은 시간대의 과목을 신청했습니다.';
+      return;
+    }
+  }
+  // ------------------------------------------------
+
   const courseRef = ref(db, 'courses/' + courseId);
   const appliedListRef =
     ref(db, 'courseApplied/' + courseId + '/' + encodeURIComponent(student.name));
@@ -223,7 +280,6 @@ function cancelCourse(courseId) {
 
       msgEl.textContent = '신청이 취소되었습니다.';
 
-      // 취소 후 대기자 승급
       promoteWaiting(courseId);
     })
     .catch(() => {
@@ -262,7 +318,7 @@ function cancelWaiting(courseId) {
   msgEl.textContent = '대기 신청이 취소되었습니다.';
 }
 
-// 대기자 → 자동 승급 처리
+// 대기 승급 처리
 function promoteWaiting(courseId) {
   const waitingRef = ref(db, 'courseWaiting/' + courseId);
 
@@ -280,32 +336,52 @@ function promoteWaiting(courseId) {
   });
 }
 
-// 대기자 승급 처리
+// 승급 시 시간 중복 체크 포함
 function applyCourseDirect(courseId, stu, studentKey) {
-  const courseRef = ref(db, 'courses/' + courseId);
-  const appliedListRef = ref(db, 'courseApplied/' + courseId + '/' + studentKey);
-  const appliedByStudentRef = ref(db, 'appliedByStudent/' + studentKey + '/' + courseId);
+  const appliedRef = ref(db, 'appliedByStudent/' + studentKey);
 
-  runTransaction(courseRef, (course) => {
-    if (course) {
-      const capacity = course.capacity || 0;
-      const appliedCount = course.appliedCount || 0;
-      if (capacity && appliedCount >= capacity) return;
+  get(appliedRef).then((snap) => {
+    const hisApplied = snap.val() || {};
 
-      course.appliedCount = appliedCount + 1;
+    // 시간 중복 체크
+    const myTimeList = getMyAppliedTimeList(allCoursesCache, hisApplied);
+    const newTime = parseTimeStr(allCoursesCache[courseId].time);
+
+    for (const t of myTimeList) {
+      if (isTimeConflict(t, newTime)) {
+        // 시간 충돌 → 승급 불가 → 대기 제거만 수행
+        remove(ref(db, 'courseWaiting/' + courseId + '/' + studentKey));
+        remove(ref(db, 'courseWaitingByStudent/' + studentKey + '/' + courseId));
+        return;
+      }
     }
-    return course;
-  }).then(() => {
-    remove(ref(db, 'courseWaiting/' + courseId + '/' + studentKey));
-    remove(ref(db, 'courseWaitingByStudent/' + studentKey + '/' + courseId));
 
-    set(appliedListRef, {
-      grade: stu.grade,
-      class: stu.class,
-      name: stu.name
+    // 정상 승급 진행
+    const courseRef = ref(db, 'courses/' + courseId);
+    const appliedListRef = ref(db, 'courseApplied/' + courseId + '/' + studentKey);
+    const appliedByStudentRef = ref(db, 'appliedByStudent/' + studentKey + '/' + courseId);
+
+    runTransaction(courseRef, (course) => {
+      if (course) {
+        const capacity = course.capacity || 0;
+        const appliedCount = course.appliedCount || 0;
+        if (capacity && appliedCount >= capacity) return;
+
+        course.appliedCount = appliedCount + 1;
+      }
+      return course;
+    }).then(() => {
+      remove(ref(db, 'courseWaiting/' + courseId + '/' + studentKey));
+      remove(ref(db, 'courseWaitingByStudent/' + studentKey + '/' + courseId));
+
+      set(appliedListRef, {
+        grade: stu.grade,
+        class: stu.class,
+        name: stu.name
+      });
+
+      set(appliedByStudentRef, true);
     });
-
-    set(appliedByStudentRef, true);
   });
 }
 
