@@ -18,6 +18,11 @@
     .section { margin-top:18px; }
     input, select { padding:6px 8px; border-radius:6px; border:1px solid #d0d7e2; }
     .msg { font-size:13px; margin-top:6px; }
+    .btn-danger { background:#ef4444; color:#fff; }
+    .btn-secondary { background:#e5e7eb; color:#374151; }
+    .btn-primary { background:#2563eb; color:#fff; }
+    .btn-sm { padding:4px 8px; font-size:12px; }
+    .actions { display:flex; flex-wrap:wrap; gap:4px; }
   </style>
 </head>
 <body>
@@ -30,19 +35,22 @@
     </div>
     <div class="small">과목 추가/수정 및 학생 신청 현황을 확인할 수 있습니다.</div>
 
+    <!-- 과목 등록 / 수정 영역 -->
     <div class="section">
-      <h3>과목 등록</h3>
+      <h3>과목 등록 / 수정</h3>
       <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
         <input id="cName" placeholder="과목명" />
         <input id="cTime" placeholder="시간 예: 월 3~4교시" />
         <input id="cMinG" style="width:60px;" placeholder="최소학년" />
         <input id="cMaxG" style="width:60px;" placeholder="최대학년" />
         <input id="cCap" style="width:80px;" placeholder="정원" />
-        <button id="addCourseBtn">과목 추가</button>
+        <button id="addCourseBtn" class="btn-primary">과목 추가</button>
+        <button id="cancelEditBtn" class="btn-secondary" style="display:none;">수정 취소</button>
       </div>
       <div class="msg" id="courseMsg"></div>
     </div>
 
+    <!-- 과목 목록 -->
     <div class="section">
       <h3>과목 목록</h3>
       <table id="courseTable">
@@ -54,12 +62,14 @@
             <th>정원</th>
             <th>신청 인원</th>
             <th>신청자 보기</th>
+            <th>관리</th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
     </div>
 
+    <!-- 신청자 목록 -->
     <div class="section">
       <h3>선택한 과목 신청자</h3>
       <div class="small" id="selectedCourseInfo">과목을 선택하면 신청자 목록이 보입니다.</div>
@@ -80,8 +90,15 @@
 
   <script type="module">
     import { auth, db } from './firebase-config.js';
+    import {
+      ref,
+      push,
+      set,
+      onValue,
+      update,
+      get
+    } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
     import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
-    import { ref, push, set, onValue } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
     const logoutBtn = document.getElementById('logoutBtn');
     const courseMsg = document.getElementById('courseMsg');
@@ -96,10 +113,13 @@
     const cMaxG = document.getElementById('cMaxG');
     const cCap  = document.getElementById('cCap');
     const addCourseBtn = document.getElementById('addCourseBtn');
+    const cancelEditBtn = document.getElementById('cancelEditBtn');
 
     let coursesCache = {};
     let selectedCourseId = null;
+    let editingCourseId = null;  // 수정 중인 과목 id
 
+    // 로그인 체크
     onAuthStateChanged(auth, (user) => {
       if (!user) {
         window.location.href = 'admin-login.html';
@@ -111,8 +131,24 @@
       window.location.href = 'admin-login.html';
     });
 
+    // 폼 초기화
+    function resetCourseForm() {
+      cName.value = '';
+      cTime.value = '';
+      cMinG.value = '';
+      cMaxG.value = '';
+      cCap.value  = '';
+      editingCourseId = null;
+      addCourseBtn.textContent = '과목 추가';
+      cancelEditBtn.style.display = 'none';
+      courseMsg.textContent = '';
+    }
+
+    // 과목 추가 / 수정 버튼
     addCourseBtn.addEventListener('click', async () => {
       courseMsg.textContent = '';
+      adminMsg.textContent = '';
+
       const name = cName.value.trim();
       const time = cTime.value.trim();
       const minGrade = cMinG.value.trim();
@@ -124,20 +160,111 @@
         return;
       }
 
-      const coursesRef = ref(db, 'courses');
-      const newRef = push(coursesRef);
-      await set(newRef, {
-        name,
-        time,
-        minGrade,
-        maxGrade,
-        capacity: cap,
-        appliedCount: 0
-      });
-      courseMsg.textContent = '과목이 추가되었습니다.';
-      cName.value = cTime.value = cMinG.value = cMaxG.value = cCap.value = '';
+      try {
+        if (editingCourseId) {
+          // ✅ 과목 수정
+          const courseRef = ref(db, 'courses/' + editingCourseId);
+          await update(courseRef, {
+            name,
+            time,
+            minGrade,
+            maxGrade,
+            capacity: cap
+          });
+          courseMsg.textContent = '과목 정보가 수정되었습니다.';
+        } else {
+          // ✅ 과목 신규 추가
+          const coursesRef = ref(db, 'courses');
+          const newRef = push(coursesRef);
+          await set(newRef, {
+            name,
+            time,
+            minGrade,
+            maxGrade,
+            capacity: cap,
+            appliedCount: 0
+          });
+          courseMsg.textContent = '과목이 추가되었습니다.';
+        }
+        resetCourseForm();
+      } catch (e) {
+        console.error(e);
+        courseMsg.textContent = '저장 중 오류가 발생했습니다.';
+      }
     });
 
+    // 수정 취소 버튼
+    cancelEditBtn.addEventListener('click', () => {
+      resetCourseForm();
+    });
+
+    // 수정 시작
+    function startEditCourse(courseId) {
+      const c = coursesCache[courseId];
+      if (!c) return;
+
+      editingCourseId = courseId;
+      cName.value = c.name || '';
+      cTime.value = c.time || '';
+      cMinG.value = c.minGrade || '';
+      cMaxG.value = c.maxGrade || '';
+      cCap.value  = c.capacity != null ? c.capacity : '';
+
+      addCourseBtn.textContent = '과목 수정 저장';
+      cancelEditBtn.style.display = 'inline-block';
+      courseMsg.textContent = '과목 정보를 수정 후 "과목 수정 저장"을 눌러 주세요.';
+    }
+
+    // 과목 삭제 (신청자/카운트 정리 포함)
+    async function deleteCourse(courseId) {
+      const c = coursesCache[courseId];
+      const courseName = c && c.name ? c.name : '';
+
+      const ok = confirm(
+        courseName
+          ? `과목 "${courseName}"을(를) 삭제하면 해당 과목의 신청 정보도 모두 삭제됩니다.\n계속하시겠습니까?`
+          : '해당 과목을 삭제하면 신청 정보도 모두 삭제됩니다.\n계속하시겠습니까?'
+      );
+      if (!ok) return;
+
+      adminMsg.textContent = '과목 삭제 중...';
+
+      try {
+        // 1) 이 과목에 신청한 학생 목록 가져오기
+        const appliedRef = ref(db, 'courseApplied/' + courseId);
+        const snap = await get(appliedRef);
+        const appliedData = snap.val() || {};
+
+        const updates = {};
+
+        // 2) 학생 기준 appliedByStudent 에서 이 과목 제거
+        Object.keys(appliedData).forEach((studentKey) => {
+          // studentKey 는 encodeURIComponent(이름) 형태
+          updates['appliedByStudent/' + studentKey + '/' + courseId] = null;
+        });
+
+        // 3) 과목 기준 신청 목록 삭제
+        updates['courseApplied/' + courseId] = null;
+
+        // 4) 실제 과목 정보 삭제
+        updates['courses/' + courseId] = null;
+
+        // 한 번에 업데이트
+        await update(ref(db), updates);
+
+        // 혹시 수정 중인 과목을 지웠다면 폼 리셋
+        if (editingCourseId === courseId) {
+          resetCourseForm();
+        }
+
+        adminMsg.textContent = '과목이 삭제되었습니다.';
+      } catch (e) {
+        console.error(e);
+        adminMsg.textContent = '과목 삭제 중 오류가 발생했습니다.';
+      }
+    }
+
+    // 과목 목록 불러오기
     function loadCourses() {
       const coursesRef = ref(db, 'courses');
       onValue(coursesRef, (snap) => {
@@ -146,6 +273,7 @@
       });
     }
 
+    // 과목 목록 렌더링
     function renderCourses() {
       tbodyCourses.innerHTML = '';
       Object.entries(coursesCache).forEach(([id, c]) => {
@@ -154,20 +282,50 @@
           <td>${c.name || ''}</td>
           <td>${c.minGrade || ''}~${c.maxGrade || ''}</td>
           <td>${c.time || ''}</td>
-          <td>${c.capacity || '-'}</td>
+          <td>${c.capacity != null ? c.capacity : '-'}</td>
           <td>${c.appliedCount || 0}</td>
-          <td><button data-id="${id}">보기</button></td>
+          <td><button class="btn-sm btn-secondary" data-id="${id}" data-action="view">보기</button></td>
+          <td>
+            <div class="actions">
+              <button class="btn-sm btn-primary" data-id="${id}" data-action="edit">수정</button>
+              <button class="btn-sm btn-danger" data-id="${id}" data-action="delete">삭제</button>
+            </div>
+          </td>
         `;
-        const btn = tr.querySelector('button');
-        btn.addEventListener('click', () => {
+
+        const viewBtn = tr.querySelector('button[data-action="view"]');
+        const editBtn = tr.querySelector('button[data-action="edit"]');
+        const delBtn  = tr.querySelector('button[data-action="delete"]');
+
+        viewBtn.addEventListener('click', () => {
           selectedCourseId = id;
           selectedCourseInfo.textContent = `선택한 과목: ${c.name || ''}`;
           loadAppliedForCourse(id);
         });
+
+        editBtn.addEventListener('click', () => {
+          startEditCourse(id);
+        });
+
+        delBtn.addEventListener('click', () => {
+          deleteCourse(id);
+        });
+
         tbodyCourses.appendChild(tr);
       });
+
+      // 과목이 없을 때 안내
+      if (!Object.keys(coursesCache).length) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 7;
+        td.textContent = '등록된 과목이 없습니다. 위에서 과목을 추가해 주세요.';
+        tr.appendChild(td);
+        tbodyCourses.appendChild(tr);
+      }
     }
 
+    // 선택한 과목 신청자 목록 불러오기
     function loadAppliedForCourse(courseId) {
       const appliedRef = ref(db, 'courseApplied/' + courseId);
       onValue(appliedRef, (snap) => {
@@ -182,6 +340,15 @@
           `;
           tbodyApplied.appendChild(tr);
         });
+
+        if (!Object.keys(data).length) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 3;
+          td.textContent = '신청한 학생이 없습니다.';
+          tr.appendChild(td);
+          tbodyApplied.appendChild(tr);
+        }
       });
     }
 
