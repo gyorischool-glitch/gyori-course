@@ -29,6 +29,7 @@
     <h2>수강신청</h2>
     <div class="student" id="studentInfo"></div>
     <div class="msg" id="msg"></div>
+
     <table id="courseTable">
       <thead>
         <tr>
@@ -36,7 +37,7 @@
           <th>대상 학년</th>
           <th>시간</th>
           <th>정원</th>
-          <th>신청 상태</th>
+          <th>상태</th>
           <th>신청</th>
         </tr>
       </thead>
@@ -44,161 +45,273 @@
     </table>
   </div>
 
-  <script type="module">
-    import { app, db } from './firebase-config.js';
-    import { ref, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+<script type="module">
+import { app, db } from './firebase-config.js';
+import {
+  ref,
+  onValue,
+  runTransaction,
+  set,
+  remove,
+  get
+} from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
-    const studentInfoEl = document.getElementById('studentInfo');
-    const msgEl = document.getElementById('msg');
-    const tbody = document.querySelector('#courseTable tbody');
+const studentInfoEl = document.getElementById('studentInfo');
+const msgEl = document.getElementById('msg');
+const tbody = document.querySelector('#courseTable tbody');
 
-    let student = null;
+let student = null;
 
-    function loadStudent() {
-      const raw = localStorage.getItem('gyori_student');
-      if (!raw) {
-        studentInfoEl.textContent = '학생 정보가 없습니다. 처음 화면으로 돌아가 다시 입력해 주세요.';
-        msgEl.textContent = '';
+// 학생 정보 로드
+function loadStudent() {
+  const raw = localStorage.getItem('gyori_student');
+  if (!raw) {
+    studentInfoEl.textContent = '학생 정보가 없습니다. 처음 화면으로 돌아가 다시 입력해 주세요.';
+    msgEl.textContent = '';
+    return;
+  }
+  student = JSON.parse(raw);
+  studentInfoEl.textContent = `학년: ${student.grade} / 반: ${student.class} / 이름: ${student.name}`;
+}
+
+// 과목 렌더링
+function renderCourses(courses, studentApplied, studentWaiting) {
+  tbody.innerHTML = '';
+  const gradeNum = parseInt(student.grade, 10);
+
+  Object.entries(courses || {}).forEach(([id, c]) => {
+    // 학년 필터링
+    const minG = parseInt(c.minGrade, 10);
+    const maxG = parseInt(c.maxGrade, 10);
+    if (!isNaN(minG) && !isNaN(maxG) && (gradeNum < minG || gradeNum > maxG)) return;
+
+    const tr = document.createElement('tr');
+
+    const appliedCount = c.appliedCount || 0;
+    const capacity = c.capacity || 0;
+    const isFull = capacity > 0 && appliedCount >= capacity;
+    const isApplied = studentApplied && studentApplied[id];
+    const isWaiting = studentWaiting && studentWaiting[id];
+
+    tr.innerHTML = `
+      <td>${c.name || ''}</td>
+      <td>${c.minGrade || ''}~${c.maxGrade || ''}</td>
+      <td>${c.time || ''}</td>
+      <td>${appliedCount}/${capacity || '-'}</td>
+      <td>${isApplied ? '신청완료' : isWaiting ? '대기중' : (isFull ? '마감' : '신청가능')}</td>
+      <td></td>
+    `;
+
+    const btnCell = tr.lastElementChild;
+    const btn = document.createElement('button');
+
+    if (isApplied) {
+      btn.textContent = '신청취소';
+      btn.className = 'cancel';
+      btn.onclick = () => cancelCourse(id);
+    }
+    else if (isWaiting) {
+      btn.textContent = '대기취소';
+      btn.className = 'cancel';
+      btn.onclick = () => cancelWaiting(id);
+    }
+    else if (isFull) {
+      btn.textContent = '대기신청';
+      btn.className = 'apply';
+      btn.onclick = () => applyWaiting(id);
+    }
+    else {
+      btn.textContent = '신청';
+      btn.className = 'apply';
+      btn.onclick = () => applyCourse(id);
+    }
+
+    btnCell.appendChild(btn);
+    tbody.appendChild(tr);
+  });
+}
+
+// 과목+대기 데이터 감시
+function watchCourses() {
+  if (!student) return;
+
+  const coursesRef = ref(db, 'courses');
+  const appliedRef = ref(db, 'appliedByStudent/' + encodeURIComponent(student.name));
+  const waitingRef = ref(db, 'courseWaitingByStudent/' + encodeURIComponent(student.name));
+
+  onValue(coursesRef, (snapCourses) => {
+    const courses = snapCourses.val() || {};
+
+    onValue(appliedRef, (snapApplied) => {
+      const myApplied = snapApplied.val() || {};
+
+      onValue(waitingRef, (snapWaiting) => {
+        const myWaiting = snapWaiting.val() || {};
+
+        renderCourses(courses, myApplied, myWaiting);
+      });
+    });
+  });
+}
+
+//
+// -------------------- 신청 기능 --------------------
+//
+
+// 정상 신청
+function applyCourse(courseId) {
+  if (!student) return;
+
+  msgEl.textContent = '';
+  const courseRef = ref(db, 'courses/' + courseId);
+  const appliedListRef =
+    ref(db, 'courseApplied/' + courseId + '/' + encodeURIComponent(student.name));
+  const appliedByStudentRef =
+    ref(db, 'appliedByStudent/' + encodeURIComponent(student.name) + '/' + courseId);
+
+  runTransaction(courseRef, (course) => {
+    if (course) {
+      const capacity = course.capacity || 0;
+      const appliedCount = course.appliedCount || 0;
+      if (capacity && appliedCount >= capacity) {
         return;
       }
-      student = JSON.parse(raw);
-      studentInfoEl.textContent = `학년: ${student.grade} / 반: ${student.class} / 이름: ${student.name}`;
+      course.appliedCount = appliedCount + 1;
     }
+    return course;
+  })
+    .then((result) => {
+      if (!result.committed) {
+        msgEl.textContent = '정원이 가득 찼습니다.';
+        return;
+      }
 
-    function renderCourses(courses, studentApplied) {
-      tbody.innerHTML = '';
-      const gradeNum = parseInt(student.grade, 10);
-
-      Object.entries(courses || {}).forEach(([id, c]) => {
-        const tr = document.createElement('tr');
-
-        // 대상 학년 필터링
-        if (c.minGrade && c.maxGrade) {
-          const minG = parseInt(c.minGrade, 10);
-          const maxG = parseInt(c.maxGrade, 10);
-          if (!isNaN(minG) && !isNaN(maxG) && (gradeNum < minG || gradeNum > maxG)) {
-            return;
-          }
-        }
-
-        const appliedCount = c.appliedCount || 0;
-        const capacity = c.capacity || 0;
-        const isApplied = studentApplied && studentApplied[id];
-        const isFull = capacity > 0 && appliedCount >= capacity;
-
-        tr.innerHTML = `
-          <td>${c.name || ''}</td>
-          <td>${c.minGrade || ''}~${c.maxGrade || ''}</td>
-          <td>${c.time || ''}</td>
-          <td>${appliedCount}/${capacity || '-'}</td>
-          <td>${isApplied ? '신청완료' : (isFull ? '마감' : '신청가능')}</td>
-          <td></td>
-        `;
-
-        const btnCell = tr.lastElementChild;
-        const btn = document.createElement('button');
-
-        if (isApplied) {
-          btn.textContent = '신청취소';
-          btn.className = 'cancel';
-          btn.onclick = () => cancelCourse(id);
-        } else if (isFull) {
-          btn.textContent = '마감';
-          btn.disabled = true;
-        } else {
-          btn.textContent = '신청';
-          btn.className = 'apply';
-          btn.onclick = () => applyCourse(id);
-        }
-
-        btnCell.appendChild(btn);
-        tbody.appendChild(tr);
+      set(appliedListRef, {
+        grade: student.grade,
+        class: student.class,
+        name: student.name
       });
+      set(appliedByStudentRef, true);
+
+      msgEl.textContent = '신청이 완료되었습니다.';
+    })
+    .catch(() => {
+      msgEl.textContent = '신청 중 오류가 발생했습니다.';
+    });
+}
+
+// 신청 취소
+function cancelCourse(courseId) {
+  msgEl.textContent = '';
+
+  const courseRef = ref(db, 'courses/' + courseId);
+  const appliedListRef =
+    ref(db, 'courseApplied/' + courseId + '/' + encodeURIComponent(student.name));
+  const appliedByStudentRef =
+    ref(db, 'appliedByStudent/' + encodeURIComponent(student.name) + '/' + courseId);
+
+  runTransaction(courseRef, (course) => {
+    if (course) {
+      const appliedCount = course.appliedCount || 0;
+      course.appliedCount = appliedCount > 0 ? appliedCount - 1 : 0;
     }
+    return course;
+  })
+    .then(() => {
+      remove(appliedListRef);
+      remove(appliedByStudentRef);
 
-    function watchCourses() {
-      if (!student) return;
-      const coursesRef = ref(db, 'courses');
-      const myAppliedRef = ref(db, 'appliedByStudent/' + encodeURIComponent(student.name));
+      msgEl.textContent = '신청이 취소되었습니다.';
 
-      onValue(coursesRef, (snapCourses) => {
-        const courses = snapCourses.val() || {};
-        onValue(myAppliedRef, (snapApplied) => {
-          const myApplied = snapApplied.val() || {};
-          renderCourses(courses, myApplied);
-        }, { onlyOnce: true });
-      });
+      // 취소 후 대기자 승급
+      promoteWaiting(courseId);
+    })
+    .catch(() => {
+      msgEl.textContent = '취소 중 오류가 발생했습니다.';
+    });
+}
+
+//
+// -------------------- 대기자 기능 --------------------
+//
+
+// 대기 신청
+function applyWaiting(courseId) {
+  const waitingRef =
+    ref(db, 'courseWaiting/' + courseId + '/' + encodeURIComponent(student.name));
+
+  const waitingByStudentRef =
+    ref(db, 'courseWaitingByStudent/' + encodeURIComponent(student.name) + '/' + courseId);
+
+  set(waitingRef, {
+    grade: student.grade,
+    class: student.class,
+    name: student.name,
+    timestamp: Date.now()
+  });
+
+  set(waitingByStudentRef, true);
+
+  msgEl.textContent = '대기 신청이 완료되었습니다.';
+}
+
+// 대기 취소
+function cancelWaiting(courseId) {
+  remove(ref(db, 'courseWaiting/' + courseId + '/' + encodeURIComponent(student.name)));
+  remove(ref(db, 'courseWaitingByStudent/' + encodeURIComponent(student.name) + '/' + courseId));
+  msgEl.textContent = '대기 신청이 취소되었습니다.';
+}
+
+// 대기자 → 자동 승급 처리
+function promoteWaiting(courseId) {
+  const waitingRef = ref(db, 'courseWaiting/' + courseId);
+
+  get(waitingRef).then((snap) => {
+    const waitingList = snap.val();
+    if (!waitingList) return;
+
+    const entries = Object.entries(waitingList);
+    if (!entries.length) return;
+
+    entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+    const [studentKey, stu] = entries[0];
+
+    applyCourseDirect(courseId, stu, studentKey);
+  });
+}
+
+// 대기자 승급 처리
+function applyCourseDirect(courseId, stu, studentKey) {
+  const courseRef = ref(db, 'courses/' + courseId);
+  const appliedListRef = ref(db, 'courseApplied/' + courseId + '/' + studentKey);
+  const appliedByStudentRef = ref(db, 'appliedByStudent/' + studentKey + '/' + courseId);
+
+  runTransaction(courseRef, (course) => {
+    if (course) {
+      const capacity = course.capacity || 0;
+      const appliedCount = course.appliedCount || 0;
+      if (capacity && appliedCount >= capacity) return;
+
+      course.appliedCount = appliedCount + 1;
     }
+    return course;
+  }).then(() => {
+    remove(ref(db, 'courseWaiting/' + courseId + '/' + studentKey));
+    remove(ref(db, 'courseWaitingByStudent/' + studentKey + '/' + courseId));
 
-    function applyCourse(courseId) {
-      if (!student) return;
-      msgEl.textContent = '';
+    set(appliedListRef, {
+      grade: stu.grade,
+      class: stu.class,
+      name: stu.name
+    });
 
-      const courseRef = ref(db, 'courses/' + courseId);
-      const appliedByStudentRef = ref(db, 'appliedByStudent/' + encodeURIComponent(student.name) + '/' + courseId);
-      const appliedListRef = ref(db, 'courseApplied/' + courseId + '/' + encodeURIComponent(student.name));
+    set(appliedByStudentRef, true);
+  });
+}
 
-      runTransaction(courseRef, (course) => {
-        if (course) {
-          const capacity = course.capacity || 0;
-          const appliedCount = course.appliedCount || 0;
-          if (capacity && appliedCount >= capacity) {
-            return; // 정원 초과
-          }
-          course.appliedCount = appliedCount + 1;
-        }
-        return course;
-      }).then((result) => {
-        if (!result.committed) {
-          msgEl.textContent = '정원이 가득 찼습니다.';
-          return;
-        }
-        // 학생 기준
-        import("https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js").then(({ set }) => {
-          set(appliedByStudentRef, true);
-          set(appliedListRef, {
-            grade: student.grade,
-            class: student.class,
-            name: student.name
-          });
-          msgEl.textContent = '신청이 완료되었습니다.';
-        });
-      }).catch((e) => {
-        console.error(e);
-        msgEl.textContent = '신청 중 오류가 발생했습니다.';
-      });
-    }
+loadStudent();
+if (student) watchCourses();
 
-    function cancelCourse(courseId) {
-      if (!student) return;
-      msgEl.textContent = '';
-
-      const courseRef = ref(db, 'courses/' + courseId);
-      const appliedByStudentRef = ref(db, 'appliedByStudent/' + encodeURIComponent(student.name) + '/' + courseId);
-      const appliedListRef = ref(db, 'courseApplied/' + courseId + '/' + encodeURIComponent(student.name));
-
-      runTransaction(courseRef, (course) => {
-        if (course) {
-          const appliedCount = course.appliedCount || 0;
-          course.appliedCount = appliedCount > 0 ? appliedCount - 1 : 0;
-        }
-        return course;
-      }).then(() => {
-        import("https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js").then(({ remove }) => {
-          remove(appliedByStudentRef);
-          remove(appliedListRef);
-          msgEl.textContent = '신청이 취소되었습니다.';
-        });
-      }).catch((e) => {
-        console.error(e);
-        msgEl.textContent = '취소 중 오류가 발생했습니다.';
-      });
-    }
-
-    loadStudent();
-    if (student) {
-      watchCourses();
-    }
-  </script>
+</script>
 </body>
 </html>
