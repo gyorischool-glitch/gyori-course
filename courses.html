@@ -18,6 +18,18 @@
     .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-size:14px; }
     a { color:#2563eb; text-decoration:none; }
     .msg { margin-top:8px; font-size:13px; }
+  
+    @media (max-width: 768px) {
+      body { background:#f9fafb; }
+      .wrap { max-width:100%; margin:0; border-radius:0; box-shadow:none; padding:12px; }
+      h2 { font-size:18px; }
+      .student { font-size:13px; margin-bottom:8px; }
+      .topbar { flex-direction:column; align-items:flex-start; gap:4px; font-size:13px; }
+      table { display:block; width:100%; overflow-x:auto; font-size:12px; }
+      th, td { padding:6px 4px; white-space:nowrap; }
+      button { padding:8px 12px; font-size:13px; }
+    }
+    
   </style>
 </head>
 <body>
