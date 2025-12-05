@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>관리자 로그인 - 교리초 수강신청</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin:0; padding:0; background:#f5f7fb; }
+    .wrap { max-width:480px; margin:40px auto; background:#fff; border-radius:12px; padding:24px; box-shadow:0 8px 20px rgba(0,0,0,.06); }
+    h2 { margin-top:0; font-size:20px; }
+    label { display:block; margin:10px 0 4px; font-size:14px; }
+    input { width:100%; padding:10px; border-radius:6px; border:1px solid #d0d7e2; box-sizing:border-box; }
+    button { margin-top:16px; width:100%; padding:10px; border-radius:8px; border:none; background:#2563eb; color:#fff; font-weight:600; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:default; }
+    .msg { margin-top:8px; font-size:13px; color:#ef4444; }
+    .back { margin-top:12px; display:block; text-align:center; text-decoration:none; color:#2563eb; font-size:14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h2>관리자 로그인</h2>
+    <label>관리자 이메일</label>
+    <input id="email" type="email" placeholder="예: kyoree2002@korea.kr" />
+    <label>비밀번호</label>
+    <input id="password" type="password" placeholder="비밀번호" />
+    <button id="loginBtn">로그인</button>
+    <div class="msg" id="msg"></div>
+    <a href="index.html" class="back">← 메인으로</a>
+  </div>
+
+  <script type="module">
+    import { auth } from './firebase-config.js';
+    import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+
+    const emailEl = document.getElementById('email');
+    const pwEl = document.getElementById('password');
+    const msgEl = document.getElementById('msg');
+    const btn = document.getElementById('loginBtn');
+
+    btn.addEventListener('click', async () => {
+      msgEl.textContent = '';
+      btn.disabled = true;
+      try {
+        await signInWithEmailAndPassword(auth, emailEl.value.trim(), pwEl.value.trim());
+        window.location.href = 'admin.html';
+      } catch (e) {
+        console.error(e);
+        msgEl.textContent = '로그인 실패: ' + (e.code || e.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
