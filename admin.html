@@ -22,9 +22,12 @@
     tr.dragElem { opacity:0.4; background:#eef2ff; }
     tr.over { border-top:2px solid #2563eb; }
     .msg { font-size:13px; color:#2563eb; min-height:20px; }
-  </style>
+  .topbar{background:#f3f4f6;padding:10px 12px;border-radius:8px;margin-bottom:16px;}
+</style>
 </head>
 <body>
+<div class="topbar" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding:8px 4px;font-size:15px;background:#f3f4f6;border-radius:8px;"><strong>관리자 페이지</strong><button id="logoutBtn" class="btn-ghost" style="padding:6px 10px;">로그아웃</button></div>
+
 <div class="wrap">
   <h2>관리자 페이지</h2>
   <div class="msg" id="adminMsg"></div>
@@ -116,6 +119,9 @@
 </div>
 
 <script type="module">
+import { auth } from "./firebase-config.js";
+import { signOut } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+
 import { app, db } from "./firebase-config.js";
 import { ref, set, get, update, remove, onValue } 
 from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
@@ -562,6 +568,13 @@ function renderFilterOptions() {
   });
   filterCategory.value = current;
 }
+
+document.getElementById("logoutBtn").onclick = () => {
+  if (!confirm("로그아웃 하시겠습니까?")) return;
+  signOut(auth).then(()=> window.location.href="admin-login.html")
+  .catch(e=>{console.error(e); alert("로그아웃 오류 발생");});
+};
 </script>
+
 </body>
 </html>
