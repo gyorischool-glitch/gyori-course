@@ -5,7 +5,7 @@
   <title>관리자 페이지 - 교리초 수강신청</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin:0; padding:0; background:#f5f7fb; }
+    body { font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; margin:0; padding:0; background:#f5f7fb; }
     .wrap { max-width:960px; margin:20px auto; background:#fff; border-radius:12px; padding:20px; box-shadow:0 8px 20px rgba(0,0,0,.06); }
     h2 { margin-top:0; font-size:20px; }
     .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-size:14px; }
@@ -15,21 +15,16 @@
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
     th, td { border-bottom:1px solid #e5e7eb; padding:8px 6px; text-align:left; }
     th { background:#f3f4f6; }
+    input { padding:6px 8px; border-radius:6px; border:1px solid #d1d5db; font-size:13px; }
     .section { margin-top:18px; }
-    input, select { padding:6px 8px; border-radius:6px; border:1px solid #d0d7e2; }
-    .msg { font-size:13px; margin-top:6px; }
-  
+    .msg { margin-top:6px; font-size:13px; color:#ef4444; }
     @media (max-width: 768px) {
-      body { background:#f9fafb; }
       .wrap { max-width:100%; margin:0; border-radius:0; box-shadow:none; padding:12px; }
-      h2 { font-size:18px; }
-      .student { font-size:13px; margin-bottom:8px; }
       .topbar { flex-direction:column; align-items:flex-start; gap:4px; font-size:13px; }
       table { display:block; width:100%; overflow-x:auto; font-size:12px; }
       th, td { padding:6px 4px; white-space:nowrap; }
       button { padding:8px 12px; font-size:13px; }
     }
-    
   </style>
 </head>
 <body>
@@ -40,17 +35,19 @@
         <button class="logout" id="logoutBtn">로그아웃</button>
       </div>
     </div>
-    <div class="small">과목 추가/수정 및 학생 신청 현황을 확인할 수 있습니다.</div>
+    <div class="small">과목 등록/수정 및 학생 신청 현황을 관리할 수 있습니다. (구분: 무상/유상/예체능 등)</div>
 
     <div class="section">
       <h3>과목 등록</h3>
       <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
         <input id="cName" placeholder="과목명" />
+        <input id="cCategory" style="width:90px;" placeholder="구분(예: 무상)" />
         <input id="cTime" placeholder="시간 예: 월 3~4교시" />
-        <input id="cMinG" style="width:60px;" placeholder="최소학년" />
-        <input id="cMaxG" style="width:60px;" placeholder="최대학년" />
+        <input id="cMinG" style="width:70px;" placeholder="최소학년" />
+        <input id="cMaxG" style="width:70px;" placeholder="최대학년" />
+        <input id="cTeacher" style="width:90px;" placeholder="강사명" />
         <input id="cCap" style="width:80px;" placeholder="정원" />
-        <button id="addCourseBtn">과목 추가</button>
+        <button id="addCourseBtn">과목 저장</button>
       </div>
       <div class="msg" id="courseMsg"></div>
     </div>
@@ -61,8 +58,10 @@
         <thead>
           <tr>
             <th>과목명</th>
+            <th>구분</th>
             <th>대상 학년</th>
             <th>시간</th>
+            <th>강사</th>
             <th>정원</th>
             <th>신청 인원</th>
             <th>신청자 보기</th>
@@ -73,8 +72,8 @@
     </div>
 
     <div class="section">
-      <h3>선택한 과목 신청자</h3>
-      <div class="small" id="selectedCourseInfo">과목을 선택하면 신청자 목록이 보입니다.</div>
+      <h3>선택 과목 신청자</h3>
+      <div id="selectedCourseInfo" class="small">아래 목록에서 과목을 선택하면 신청자가 보입니다.</div>
       <table id="appliedTable">
         <thead>
           <tr>
@@ -86,97 +85,105 @@
         <tbody></tbody>
       </table>
     </div>
-
-    <div class="msg" id="adminMsg"></div>
   </div>
 
   <script type="module">
-    import { auth, db } from './firebase-config.js';
-    import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
-    import { ref, push, set, onValue } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+    import { app, db, auth } from './firebase-config.js';
+    import { signOut } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+    import { ref, push, set, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
-    const logoutBtn = document.getElementById('logoutBtn');
+    const cName = document.getElementById('cName');
+    const cCategory = document.getElementById('cCategory');
+    const cTime = document.getElementById('cTime');
+    const cMinG = document.getElementById('cMinG');
+    const cMaxG = document.getElementById('cMaxG');
+    const cTeacher = document.getElementById('cTeacher');
+    const cCap = document.getElementById('cCap');
     const courseMsg = document.getElementById('courseMsg');
-    const adminMsg = document.getElementById('adminMsg');
     const tbodyCourses = document.querySelector('#courseTable tbody');
     const tbodyApplied = document.querySelector('#appliedTable tbody');
     const selectedCourseInfo = document.getElementById('selectedCourseInfo');
 
-    const cName = document.getElementById('cName');
-    const cTime = document.getElementById('cTime');
-    const cMinG = document.getElementById('cMinG');
-    const cMaxG = document.getElementById('cMaxG');
-    const cCap  = document.getElementById('cCap');
-    const addCourseBtn = document.getElementById('addCourseBtn');
-
-    let coursesCache = {};
-    let selectedCourseId = null;
-
-    onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        window.location.href = 'admin-login.html';
-      }
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      if (!confirm('로그아웃 하시겠습니까?')) return;
+      signOut(auth).then(() => {
+        location.href = 'admin-login.html';
+      }).catch(e => {
+        alert('로그아웃 중 오류가 발생했습니다.');
+        console.error(e);
+      });
     });
 
-    logoutBtn.addEventListener('click', async () => {
-      await signOut(auth);
-      window.location.href = 'admin-login.html';
-    });
+    const coursesRef = ref(db, 'courses');
 
-    addCourseBtn.addEventListener('click', async () => {
-      courseMsg.textContent = '';
+    function addOrUpdateCourse() {
       const name = cName.value.trim();
+      const category = cCategory.value.trim();
       const time = cTime.value.trim();
-      const minGrade = cMinG.value.trim();
-      const maxGrade = cMaxG.value.trim();
-      const cap = parseInt(cCap.value.trim(), 10) || 0;
+      const minGrade = parseInt(cMinG.value || '0', 10);
+      const maxGrade = parseInt(cMaxG.value || '0', 10);
+      const teacher = cTeacher.value.trim();
+      const cap = parseInt(cCap.value || '0', 10);
 
-      if (!name) {
-        courseMsg.textContent = '과목명을 입력해 주세요.';
+      if (!name || !time) {
+        courseMsg.textContent = '과목명과 시간을 입력해 주세요.';
         return;
       }
 
-      const coursesRef = ref(db, 'courses');
-      const newRef = push(coursesRef);
-      await set(newRef, {
-        name,
-        time,
-        minGrade,
-        maxGrade,
-        capacity: cap,
-        appliedCount: 0
-      });
-      courseMsg.textContent = '과목이 추가되었습니다.';
-      cName.value = cTime.value = cMinG.value = cMaxG.value = cCap.value = '';
-    });
-
-    function loadCourses() {
-      const coursesRef = ref(db, 'courses');
-      onValue(coursesRef, (snap) => {
-        coursesCache = snap.val() || {};
-        renderCourses();
+      const newCourseRef = push(coursesRef);
+      runTransaction(newCourseRef, (cur) => {
+        if (cur === null) {
+          return {
+            name,
+            category,
+            time,
+            minGrade,
+            maxGrade,
+            teacher,
+            capacity: cap || 0,
+            appliedCount: 0
+          };
+        }
+        return cur;
+      }).then(() => {
+        courseMsg.textContent = '과목이 저장되었습니다.';
+        cName.value = '';
+        cCategory.value = '';
+        cTime.value = '';
+        cMinG.value = '';
+        cMaxG.value = '';
+        cTeacher.value = '';
+        cCap.value = '';
+      }).catch(e => {
+        console.error(e);
+        courseMsg.textContent = '저장 중 오류가 발생했습니다.';
       });
     }
 
-    function renderCourses() {
-      tbodyCourses.innerHTML = '';
-      Object.entries(coursesCache).forEach(([id, c]) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${c.name || ''}</td>
-          <td>${c.minGrade || ''}~${c.maxGrade || ''}</td>
-          <td>${c.time || ''}</td>
-          <td>${c.capacity || '-'}</td>
-          <td>${c.appliedCount || 0}</td>
-          <td><button data-id="${id}">보기</button></td>
-        `;
-        const btn = tr.querySelector('button');
-        btn.addEventListener('click', () => {
-          selectedCourseId = id;
-          selectedCourseInfo.textContent = `선택한 과목: ${c.name || ''}`;
-          loadAppliedForCourse(id);
+    document.getElementById('addCourseBtn').addEventListener('click', addOrUpdateCourse);
+
+    function loadCourses() {
+      onValue(coursesRef, (snap) => {
+        const data = snap.val() || {};
+        tbodyCourses.innerHTML = '';
+        Object.entries(data).forEach(([id, c]) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${c.name || ''}</td>
+            <td>${c.category || ''}</td>
+            <td>${(c.minGrade || '')}~${(c.maxGrade || '')}</td>
+            <td>${c.time || ''}</td>
+            <td>${c.teacher || ''}</td>
+            <td>${c.capacity || '-'}</td>
+            <td>${c.appliedCount || 0}</td>
+            <td><button data-id="${id}">보기</button></td>
+          `;
+          tr.querySelector('button').addEventListener('click', () => {
+            selectedCourseInfo.textContent = `선택한 과목: ${c.name || ''}`;
+            loadAppliedForCourse(id);
+          });
+          tbodyCourses.appendChild(tr);
         });
-        tbodyCourses.appendChild(tr);
       });
     }
 
@@ -185,13 +192,13 @@
       onValue(appliedRef, (snap) => {
         const data = snap.val() || {};
         tbodyApplied.innerHTML = '';
-        Object.values(data).forEach((stu) => {
+        Object.values(data).forEach(stu => {
           const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${stu.grade || ''}</td>
-            <td>${stu.class || ''}</td>
-            <td>${stu.name || ''}</td>
-          `;
+          tr.innerHTML = \`
+            <td>\${stu.grade || ''}</td>
+            <td>\${stu.class || ''}</td>
+            <td>\${stu.name || ''}</td>
+          \`;
           tbodyApplied.appendChild(tr);
         });
       });

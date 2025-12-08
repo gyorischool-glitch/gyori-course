@@ -5,147 +5,382 @@
   <title>수강신청 - 교리초</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin:0; padding:0; background:#f5f7fb; }
-    .wrap { max-width:720px; margin:20px auto; background:#fff; border-radius:12px; padding:20px; box-shadow:0 8px 20px rgba(0,0,0,.06); }
+    body { font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; margin:0; padding:0; background:#f5f7fb; }
+    .wrap { max-width:960px; margin:20px auto; background:#fff; border-radius:12px; padding:20px; box-shadow:0 8px 20px rgba(0,0,0,.06); }
     h2 { margin-top:0; font-size:20px; }
     .student { font-size:14px; margin-bottom:12px; color:#374151; }
+    .tabs { display:flex; gap:8px; margin-bottom:12px; }
+    .tab-btn { flex:1; padding:8px 0; border-radius:999px; border:none; cursor:pointer; font-size:14px; background:#e5e7eb; }
+    .tab-btn.active { background:#2563eb; color:#fff; }
+    .filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+    select, input { padding:6px 8px; border-radius:6px; border:1px solid #d1d5db; font-size:13px; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
     th, td { border-bottom:1px solid #e5e7eb; padding:8px 6px; text-align:left; }
     th { background:#f3f4f6; }
     button { padding:6px 10px; border-radius:6px; border:none; cursor:pointer; font-size:13px; }
     .apply { background:#2563eb; color:#fff; }
     .cancel { background:#ef4444; color:#fff; }
-    .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-size:14px; }
-    a { color:#2563eb; text-decoration:none; }
-    .msg { margin-top:8px; font-size:13px; }
-  
+    .disabled { background:#9ca3af; color:#fff; cursor:default; }
+    .msg { margin-top:8px; font-size:13px; color:#ef4444; }
+    .hidden { display:none; }
     @media (max-width: 768px) {
-      body { background:#f9fafb; }
       .wrap { max-width:100%; margin:0; border-radius:0; box-shadow:none; padding:12px; }
       h2 { font-size:18px; }
-      .student { font-size:13px; margin-bottom:8px; }
-      .topbar { flex-direction:column; align-items:flex-start; gap:4px; font-size:13px; }
+      .student { font-size:13px; }
+      .tabs { flex-direction:row; }
+      .tab-btn { font-size:13px; padding:8px 4px; }
       table { display:block; width:100%; overflow-x:auto; font-size:12px; }
       th, td { padding:6px 4px; white-space:nowrap; }
-      button { padding:8px 12px; font-size:13px; }
+      button { padding:8px 10px; font-size:13px; }
+      .filters { flex-direction:column; }
+      .filters > * { width:100%; }
     }
-    
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="topbar">
-      <div><strong>교리초 수강신청</strong></div>
-      <div><a href="index.html">← 메인으로</a></div>
-    </div>
     <h2>수강신청</h2>
     <div class="student" id="studentInfo"></div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="list">프로그램 목록</button>
+      <button class="tab-btn" data-tab="mypage">마이페이지</button>
+      <button class="tab-btn" data-tab="timetable">시간표 보기</button>
+    </div>
     <div class="msg" id="msg"></div>
-    <table id="courseTable">
-      <thead>
-        <tr>
-          <th>과목</th>
-          <th>대상 학년</th>
-          <th>시간</th>
-          <th>정원</th>
-          <th>신청 상태</th>
-          <th>신청</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+
+    <!-- 프로그램 목록 -->
+    <div id="tab-list">
+      <div class="filters">
+        <select id="filterCategory">
+          <option value="">구분 전체</option>
+        </select>
+        <div>
+          <input id="filterName" list="courseNames" placeholder="과목명 검색" />
+          <datalist id="courseNames"></datalist>
+        </div>
+        <select id="filterDay">
+          <option value="">요일 전체</option>
+          <option>월</option><option>화</option><option>수</option><option>목</option><option>금</option>
+        </select>
+        <select id="filterGrade">
+          <option value="">학년 전체</option>
+          <option value="1">1학년</option>
+          <option value="2">2학년</option>
+          <option value="3">3학년</option>
+          <option value="4">4학년</option>
+          <option value="5">5학년</option>
+          <option value="6">6학년</option>
+        </select>
+        <input id="filterTeacher" placeholder="강사명" />
+      </div>
+      <table id="courseTable">
+        <thead>
+          <tr>
+            <th>구분</th>
+            <th>과목명</th>
+            <th>요일/시간</th>
+            <th>대상 학년</th>
+            <th>강사</th>
+            <th>정원</th>
+            <th>신청 인원</th>
+            <th>상태</th>
+            <th>신청</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- 마이페이지 -->
+    <div id="tab-mypage" class="hidden">
+      <h3>나의 신청 내역</h3>
+      <table id="myTable">
+        <thead>
+          <tr>
+            <th>구분</th>
+            <th>과목명</th>
+            <th>요일/시간</th>
+            <th>대상 학년</th>
+            <th>강사</th>
+            <th>신청 상태</th>
+            <th>취소</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- 시간표 -->
+    <div id="tab-timetable" class="hidden">
+      <h3>주간 시간표</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>교시</th>
+            <th>월</th>
+            <th>화</th>
+            <th>수</th>
+            <th>목</th>
+            <th>금</th>
+          </tr>
+        </thead>
+        <tbody id="timetableBody">
+          <tr><th>1교시</th><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><th>2교시</th><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><th>3교시</th><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><th>4교시</th><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><th>5교시</th><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><th>6교시</th><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><th>7교시</th><td></td><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <script type="module">
     import { app, db } from './firebase-config.js';
-    import { ref, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+    import { ref, onValue, runTransaction, set, remove } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
     const studentInfoEl = document.getElementById('studentInfo');
     const msgEl = document.getElementById('msg');
-    const tbody = document.querySelector('#courseTable tbody');
+
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabList = document.getElementById('tab-list');
+    const tabMy = document.getElementById('tab-mypage');
+    const tabTime = document.getElementById('tab-timetable');
+
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const t = btn.dataset.tab;
+        tabList.classList.toggle('hidden', t !== 'list');
+        tabMy.classList.toggle('hidden', t !== 'mypage');
+        tabTime.classList.toggle('hidden', t !== 'timetable');
+      });
+    });
+
+    const tbodyList = document.querySelector('#courseTable tbody');
+    const tbodyMy = document.querySelector('#myTable tbody');
+    const timetableBody = document.getElementById('timetableBody');
+
+    const filterCategory = document.getElementById('filterCategory');
+    const filterName = document.getElementById('filterName');
+    const filterDay = document.getElementById('filterDay');
+    const filterGrade = document.getElementById('filterGrade');
+    const filterTeacher = document.getElementById('filterTeacher');
+    const nameListEl = document.getElementById('courseNames');
 
     let student = null;
+    let allCourses = {};
+    let myApplied = {};
 
     function loadStudent() {
       const raw = localStorage.getItem('gyori_student');
       if (!raw) {
-        studentInfoEl.textContent = '학생 정보가 없습니다. 처음 화면으로 돌아가 다시 입력해 주세요.';
-        msgEl.textContent = '';
+        alert('학생 정보가 없습니다. 다시 로그인 해 주세요.');
+        location.href = 'login.html';
         return;
       }
-      student = JSON.parse(raw);
-      studentInfoEl.textContent = `학년: ${student.grade} / 반: ${student.class} / 이름: ${student.name}`;
+      try {
+        student = JSON.parse(raw);
+      } catch(e) {
+        student = null;
+      }
+      if (!student) {
+        alert('학생 정보가 없습니다. 다시 로그인 해 주세요.');
+        location.href = 'login.html';
+        return;
+      }
+      studentInfoEl.textContent = `${student.grade}학년 ${student.class}반 ${student.name} 학생`;
     }
 
-    function renderCourses(courses, studentApplied) {
-      tbody.innerHTML = '';
-      const gradeNum = parseInt(student.grade, 10);
+    function parseTime(timeStr) {
+      // "월 3~4교시" 형태를 {day:"월", start:3, end:4}
+      if (!timeStr) return null;
+      const m = timeStr.match(/([월화수목금])\s*(\d+)~(\d+)교시?/);
+      if (!m) return null;
+      return { day: m[1], start: parseInt(m[2],10), end: parseInt(m[3],10) };
+    }
 
-      Object.entries(courses || {}).forEach(([id, c]) => {
-        const tr = document.createElement('tr');
+    function watchData() {
+      const coursesRef = ref(db, 'courses');
+      const myRef = ref(db, 'appliedByStudent/' + encodeURIComponent(student.name));
 
-        // 대상 학년 필터링
-        if (c.minGrade && c.maxGrade) {
-          const minG = parseInt(c.minGrade, 10);
-          const maxG = parseInt(c.maxGrade, 10);
-          if (!isNaN(minG) && !isNaN(maxG) && (gradeNum < minG || gradeNum > maxG)) {
-            return;
-          }
-        }
+      onValue(coursesRef, (snap) => {
+        allCourses = snap.val() || {};
+        updateFilters();
+        renderAll();
+      });
 
-        const appliedCount = c.appliedCount || 0;
-        const capacity = c.capacity || 0;
-        const isApplied = studentApplied && studentApplied[id];
-        const isFull = capacity > 0 && appliedCount >= capacity;
-
-        tr.innerHTML = `
-          <td>${c.name || ''}</td>
-          <td>${c.minGrade || ''}~${c.maxGrade || ''}</td>
-          <td>${c.time || ''}</td>
-          <td>${appliedCount}/${capacity || '-'}</td>
-          <td>${isApplied ? '신청완료' : (isFull ? '마감' : '신청가능')}</td>
-          <td></td>
-        `;
-
-        const btnCell = tr.lastElementChild;
-        const btn = document.createElement('button');
-
-        if (isApplied) {
-          btn.textContent = '신청취소';
-          btn.className = 'cancel';
-          btn.onclick = () => cancelCourse(id);
-        } else if (isFull) {
-          btn.textContent = '마감';
-          btn.disabled = true;
-        } else {
-          btn.textContent = '신청';
-          btn.className = 'apply';
-          btn.onclick = () => applyCourse(id);
-        }
-
-        btnCell.appendChild(btn);
-        tbody.appendChild(tr);
+      onValue(myRef, (snap) => {
+        myApplied = snap.val() || {};
+        renderAll();
       });
     }
 
-    function watchCourses() {
-      if (!student) return;
-      const coursesRef = ref(db, 'courses');
-      const myAppliedRef = ref(db, 'appliedByStudent/' + encodeURIComponent(student.name));
+    function updateFilters() {
+      // category options & name datalist
+      const cats = new Set();
+      const names = new Set();
+      Object.values(allCourses).forEach(c => {
+        if (c.category) cats.add(c.category);
+        if (c.name) names.add(c.name);
+      });
+      filterCategory.innerHTML = '<option value="">구분 전체</option>' + Array.from(cats).map(c=>`<option>${c}</option>`).join('');
+      nameListEl.innerHTML = Array.from(names).map(n=>`<option value="${n}"></option>`).join('');
+    }
 
-      onValue(coursesRef, (snapCourses) => {
-        const courses = snapCourses.val() || {};
-        onValue(myAppliedRef, (snapApplied) => {
-          const myApplied = snapApplied.val() || {};
-          renderCourses(courses, myApplied);
-        }, { onlyOnce: true });
+    function renderAll() {
+      renderList();
+      renderMyPage();
+      renderTimetable();
+    }
+
+    function courseMatchesFilters(c) {
+      if (filterCategory.value && c.category !== filterCategory.value) return false;
+      if (filterName.value && !String(c.name || '').includes(filterName.value.trim())) return false;
+      if (filterDay.value) {
+        const t = parseTime(c.time || '');
+        if (!t || t.day !== filterDay.value) return false;
+      }
+      if (filterGrade.value) {
+        const g = parseInt(filterGrade.value,10);
+        if ((c.minGrade && g < c.minGrade) || (c.maxGrade && g > c.maxGrade)) return false;
+      }
+      if (filterTeacher.value && !String(c.teacher || '').includes(filterTeacher.value.trim())) return false;
+      return true;
+    }
+
+    filterCategory.addEventListener('change', renderList);
+    filterName.addEventListener('input', renderList);
+    filterDay.addEventListener('change', renderList);
+    filterGrade.addEventListener('change', renderList);
+    filterTeacher.addEventListener('input', renderList);
+
+    function renderList() {
+      tbodyList.innerHTML = '';
+      const entries = Object.entries(allCourses);
+      if (!entries.length) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="9">등록된 과목이 없습니다.</td>';
+        tbodyList.appendChild(tr);
+        return;
+      }
+      entries.forEach(([id, c]) => {
+        if (!courseMatchesFilters(c)) return;
+        const tr = document.createElement('tr');
+        const t = parseTime(c.time || '');
+        const range = (c.minGrade || c.maxGrade) ? `${c.minGrade || ''}~${c.maxGrade || ''}학년` : '';
+        const cap = c.capacity || 0;
+        const appliedCount = c.appliedCount || 0;
+        const isMine = !!myApplied[id];
+
+        let status = '';
+        let btnLabel = '';
+        let btnClass = '';
+        let disabled = false;
+
+        if (isMine) {
+          status = '신청 완료';
+          btnLabel = '신청 취소';
+          btnClass = 'cancel';
+        } else if (cap && appliedCount >= cap) {
+          status = '정원 마감';
+          btnLabel = '신청 불가';
+          btnClass = 'disabled';
+          disabled = true;
+        } else {
+          status = '신청 가능';
+          btnLabel = '신청';
+          btnClass = 'apply';
+        }
+
+        tr.innerHTML = `
+          <td>${c.category || ''}</td>
+          <td>${c.name || ''}</td>
+          <td>${c.time || ''}</td>
+          <td>${range}</td>
+          <td>${c.teacher || ''}</td>
+          <td>${cap || '-'}</td>
+          <td>${appliedCount}</td>
+          <td>${status}</td>
+          <td><button class="${btnClass}" data-id="${id}" ${disabled ? 'disabled' : ''}>${btnLabel}</button></td>
+        `;
+
+        const btn = tr.querySelector('button');
+        if (!disabled) {
+          btn.addEventListener('click', () => {
+            if (isMine) {
+              cancelCourse(id);
+            } else {
+              applyCourse(id);
+            }
+          });
+        }
+
+        tbodyList.appendChild(tr);
+      });
+    }
+
+    function renderMyPage() {
+      tbodyMy.innerHTML = '';
+      const ids = Object.keys(myApplied);
+      if (!ids.length) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="7">신청한 과목이 없습니다.</td>';
+        tbodyMy.appendChild(tr);
+        return;
+      }
+      ids.forEach(id => {
+        const c = allCourses[id];
+        if (!c) return;
+        const t = parseTime(c.time || '');
+        const range = (c.minGrade || c.maxGrade) ? `${c.minGrade || ''}~${c.maxGrade || ''}학년` : '';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${c.category || ''}</td>
+          <td>${c.name || ''}</td>
+          <td>${c.time || ''}</td>
+          <td>${range}</td>
+          <td>${c.teacher || ''}</td>
+          <td>신청 완료</td>
+          <td><button class="cancel" data-id="${id}">취소</button></td>
+        `;
+        tr.querySelector('button').addEventListener('click', () => cancelCourse(id));
+        tbodyMy.appendChild(tr);
+      });
+    }
+
+    function renderTimetable() {
+      // 초기화
+      for (let r of timetableBody.rows) {
+        for (let i=1; i<r.cells.length; i++) r.cells[i].textContent = '';
+      }
+      const ids = Object.keys(myApplied);
+      ids.forEach(id => {
+        const c = allCourses[id];
+        if (!c) return;
+        const t = parseTime(c.time || '');
+        if (!t) return;
+        const dayIndex = { '월':1,'화':2,'수':3,'목':4,'금':5 }[t.day];
+        if (!dayIndex) return;
+        for (let p=t.start; p<=t.end; p++) {
+          const row = timetableBody.rows[p-1];
+          if (!row) continue;
+          const cell = row.cells[dayIndex];
+          if (cell.textContent) {
+            cell.textContent += '/' + (c.name || '');
+          } else {
+            cell.textContent = c.name || '';
+          }
+        }
       });
     }
 
     function applyCourse(courseId) {
       if (!student) return;
       msgEl.textContent = '';
-
       const courseRef = ref(db, 'courses/' + courseId);
       const appliedByStudentRef = ref(db, 'appliedByStudent/' + encodeURIComponent(student.name) + '/' + courseId);
       const appliedListRef = ref(db, 'courseApplied/' + courseId + '/' + encodeURIComponent(student.name));
@@ -155,26 +390,20 @@
           const capacity = course.capacity || 0;
           const appliedCount = course.appliedCount || 0;
           if (capacity && appliedCount >= capacity) {
-            return; // 정원 초과
+            return course; // 정원 초과
           }
           course.appliedCount = appliedCount + 1;
         }
         return course;
-      }).then((result) => {
-        if (!result.committed) {
+      }).then((res) => {
+        if (!res.committed) {
           msgEl.textContent = '정원이 가득 찼습니다.';
           return;
         }
-        // 학생 기준
-        import("https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js").then(({ set }) => {
-          set(appliedByStudentRef, true);
-          set(appliedListRef, {
-            grade: student.grade,
-            class: student.class,
-            name: student.name
-          });
-          msgEl.textContent = '신청이 완료되었습니다.';
-        });
+        return Promise.all([
+          set(appliedByStudentRef, { grade: student.grade, class: student.class, name: student.name, ts: Date.now() }),
+          set(appliedListRef, { grade: student.grade, class: student.class, name: student.name, ts: Date.now() })
+        ]);
       }).catch((e) => {
         console.error(e);
         msgEl.textContent = '신청 중 오류가 발생했습니다.';
@@ -183,6 +412,7 @@
 
     function cancelCourse(courseId) {
       if (!student) return;
+      if (!confirm('이 과목 신청을 취소하시겠습니까?')) return;
       msgEl.textContent = '';
 
       const courseRef = ref(db, 'courses/' + courseId);
@@ -196,11 +426,12 @@
         }
         return course;
       }).then(() => {
-        import("https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js").then(({ remove }) => {
-          remove(appliedByStudentRef);
-          remove(appliedListRef);
-          msgEl.textContent = '신청이 취소되었습니다.';
-        });
+        return Promise.all([
+          remove(appliedByStudentRef),
+          remove(appliedListRef)
+        ]);
+      }).then(() => {
+        msgEl.textContent = '신청이 취소되었습니다.';
       }).catch((e) => {
         console.error(e);
         msgEl.textContent = '취소 중 오류가 발생했습니다.';
@@ -209,7 +440,7 @@
 
     loadStudent();
     if (student) {
-      watchCourses();
+      watchData();
     }
   </script>
 </body>
