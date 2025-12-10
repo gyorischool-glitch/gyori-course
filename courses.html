@@ -6,35 +6,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body { font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; margin:0; padding:0; background:#f5f7fb; }
-    .wrap { max-width:1000px; margin:20px auto; background:#fff; border-radius:12px; padding:20px; box-shadow:0 8px 20px rgba(0,0,0,.06); }
-    h2 { margin:8px 0 12px; font-size:20px; }
-    .student { font-size:14px; margin-bottom:8px; color:#374151; }
-    .msg { margin-top:4px; font-size:13px; min-height:18px; color:#2563eb; }
-    .tabs { display:flex; gap:8px; margin:10px 0 6px; }
-    .tab-btn { flex:1; padding:8px 0; border-radius:999px; border:none; cursor:pointer; font-size:14px; background:#e5e7eb; color:#374151; }
+    .wrap { max-width:1100px; margin:20px auto; background:#fff; border-radius:12px; padding:20px; box-shadow:0 8px 20px rgba(0,0,0,.06); }
+    .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .student { font-size:14px; color:#374151; }
+    .logout-btn { padding:6px 12px; border-radius:999px; border:none; background:#ef4444; color:#fff; font-size:13px; cursor:pointer; }
+    h2 { margin:0 0 8px; font-size:20px; }
+    .tabs { display:flex; gap:8px; margin:8px 0 12px; }
+    .tab-btn { flex:1; padding:8px 0; border-radius:999px; border:none; cursor:pointer; font-size:14px; background:#e5e7eb; }
     .tab-btn.active { background:#2563eb; color:#fff; }
     .filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
-    table { width:100%; border-collapse:collapse; margin-top:8px; font-size:14px; }
-    th, td { border-bottom:1px solid #e5e7eb; padding:8px 6px; text-align:left; }
+    select, input { padding:6px 8px; border-radius:6px; border:1px solid #d1d5db; font-size:13px; }
+    table { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
+    th, td { border-bottom:1px solid #e5e7eb; padding:6px 4px; text-align:left; white-space:nowrap; }
     th { background:#f3f4f6; }
-    input, select { padding:6px 8px; border-radius:6px; border:1px solid #d1d5db; font-size:13px; }
     button { padding:6px 10px; border-radius:6px; border:none; cursor:pointer; font-size:13px; }
-    .apply { background:#2563eb; color:#fff; }
-    .cancel { background:#ef4444; color:#fff; }
-    .disabled { background:#9ca3af; color:#fff; cursor:default; }
+    .btn-apply { background:#2563eb; color:#fff; }
+    .btn-cancel { background:#ef4444; color:#fff; }
+    .btn-disabled { background:#9ca3af; color:#fff; cursor:default; }
+    .msg { font-size:13px; margin-top:6px; color:#ef4444; }
     .hidden { display:none; }
-    .badge { display:inline-block; padding:2px 6px; border-radius:999px; background:#e5e7eb; font-size:11px; margin-right:4px; }
-    .timetable { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
-    .timetable th, .timetable td { border:1px solid #e5e7eb; padding:6px 4px; text-align:center; }
     @media (max-width: 768px) {
       .wrap { max-width:100%; margin:0; border-radius:0; box-shadow:none; padding:12px; }
-      h2 { font-size:18px; }
-      .student { font-size:13px; }
-      .tabs { flex-direction:row; }
-      .tab-btn { font-size:13px; padding:8px 4px; }
-      table { display:block; width:100%; overflow-x:auto; font-size:12px; }
-      th, td { padding:6px 4px; white-space:nowrap; }
-      button { padding:8px 10px; font-size:13px; }
+      .topbar { flex-direction:column; align-items:flex-start; gap:6px; }
+      table { display:block; overflow-x:auto; }
       .filters { flex-direction:column; }
       .filters > * { width:100%; }
     }
@@ -43,13 +37,16 @@
 <body>
   <div class="wrap">
     <h2>수강신청</h2>
-    <div class="student" id="studentInfo"></div>
+    <div class="topbar">
+      <div class="student" id="studentInfo"></div>
+      <button id="logoutBtn" class="logout-btn">로그아웃</button>
+    </div>
     <div class="tabs">
       <button class="tab-btn active" data-tab="list">프로그램 목록</button>
       <button class="tab-btn" data-tab="mypage">마이페이지</button>
       <button class="tab-btn" data-tab="timetable">시간표 보기</button>
     </div>
-    <div class="msg" id="msg"></div>
+    <div id="msg" class="msg"></div>
 
     <!-- 프로그램 목록 -->
     <div id="tab-list">
@@ -111,7 +108,7 @@
             <th>시간</th>
             <th>대상 학년</th>
             <th>강사</th>
-            <th>신청 상태</th>
+            <th>상태</th>
             <th>취소</th>
           </tr>
         </thead>
@@ -122,10 +119,10 @@
     <!-- 시간표 -->
     <div id="tab-timetable" class="hidden">
       <h3>주간 시간표</h3>
-      <table class="timetable">
+      <table>
         <thead>
           <tr>
-            <th>교시</th>
+            <th>시간</th>
             <th>월</th>
             <th>화</th>
             <th>수</th>
@@ -134,40 +131,24 @@
           </tr>
         </thead>
         <tbody id="timetableBody">
-          <tr><th>1교시</th><td></td><td></td><td></td><td></td><td></td></tr>
-          <tr><th>2교시</th><td></td><td></td><td></td><td></td><td></td></tr>
-          <tr><th>3교시</th><td></td><td></td><td></td><td></td><td></td></tr>
-          <tr><th>4교시</th><td></td><td></td><td></td><td></td><td></td></tr>
-          <tr><th>5교시</th><td></td><td></td><td></td><td></td><td></td></tr>
-          <tr><th>6교시</th><td></td><td></td><td></td><td></td><td></td></tr>
-          <tr><th>7교시</th><td></td><td></td><td></td><td></td><td></td></tr>
+          <!-- 동적으로 시간대 행을 추가 -->
         </tbody>
       </table>
     </div>
   </div>
 
   <script type="module">
-    import { app, db } from './firebase-config.js';
+    import { db } from './firebase-config.js';
     import { ref, onValue, runTransaction, set, remove, get } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
     const studentInfoEl = document.getElementById('studentInfo');
+    const logoutBtn = document.getElementById('logoutBtn');
     const msgEl = document.getElementById('msg');
 
     const tabButtons = document.querySelectorAll('.tab-btn');
     const tabList = document.getElementById('tab-list');
     const tabMy = document.getElementById('tab-mypage');
     const tabTime = document.getElementById('tab-timetable');
-
-    tabButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        tabButtons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const t = btn.dataset.tab;
-        tabList.classList.toggle('hidden', t !== 'list');
-        tabMy.classList.toggle('hidden', t !== 'mypage');
-        tabTime.classList.toggle('hidden', t !== 'timetable');
-      });
-    });
 
     const tbodyList = document.querySelector('#courseTable tbody');
     const tbodyMy = document.querySelector('#myTable tbody');
@@ -181,9 +162,10 @@
     const nameListEl = document.getElementById('courseNames');
 
     let student = null;
+    let studentKey = null;
     let allCourses = {};
     let myApplied = {};
-    let cancelDeadline = null;
+    let settings = {};
 
     function loadStudent() {
       const raw = localStorage.getItem('gyori_student');
@@ -194,28 +176,57 @@
       }
       try {
         student = JSON.parse(raw);
-      } catch(e) {
+      } catch (e) {
         student = null;
       }
-      if (!student) {
+      if (!student || !student.name || !student.grade || !student.class) {
         alert('학생 정보가 없습니다. 다시 로그인 해 주세요.');
         location.href = 'login.html';
         return;
       }
       studentInfoEl.textContent = `${student.grade}학년 ${student.class}반 ${student.name} 학생`;
+      studentKey = encodeURIComponent(`${student.grade}-${student.class}-${student.name}`);
     }
 
-    function parseTime(str) {
-      if (!str) return null;
-      const m = str.match(/([월화수목금])\s*(\d+)~(\d+)교시?/);
+    logoutBtn.addEventListener('click', () => {
+      if (!confirm('로그아웃 하시겠습니까?')) return;
+      localStorage.removeItem('gyori_student');
+      location.href = 'login.html';
+    });
+
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const t = btn.dataset.tab;
+        tabList.classList.toggle('hidden', t !== 'list');
+        tabMy.classList.toggle('hidden', t !== 'mypage');
+        tabTime.classList.toggle('hidden', t !== 'timetable');
+      });
+    });
+
+    function parseTimeRange(timeStr) {
+      if (!timeStr) return null;
+      const m = timeStr.match(/(\d{1,2}):(\d{2})\s*~\s*(\d{1,2}):(\d{2})/);
       if (!m) return null;
-      return { day: m[1], start: parseInt(m[2],10), end: parseInt(m[3],10) };
+      const sh = parseInt(m[1], 10);
+      const sm = parseInt(m[2], 10);
+      const eh = parseInt(m[3], 10);
+      const em = parseInt(m[4], 10);
+      const start = sh * 60 + sm;
+      const end = eh * 60 + em;
+      if (isNaN(start) || isNaN(end) || end <= start) return null;
+      return { start, end };
     }
 
-    function watchData() {
+    function minutesToFreeHours(minutes) {
+      return Math.ceil(minutes / 40);
+    }
+
+    function loadData() {
       const coursesRef = ref(db, 'courses');
-      const myRef = ref(db, 'appliedByStudent/' + encodeURIComponent(student.name));
-      const cancelRef = ref(db, 'settings/cancelDeadline');
+      const myRef = ref(db, 'appliedByStudent/' + studentKey);
+      const settingsRef = ref(db, 'settings');
 
       onValue(coursesRef, (snap) => {
         allCourses = snap.val() || {};
@@ -228,8 +239,8 @@
         renderAll();
       });
 
-      onValue(cancelRef, (snap) => {
-        cancelDeadline = snap.val();
+      onValue(settingsRef, (snap) => {
+        settings = snap.val() || {};
       });
     }
 
@@ -240,24 +251,8 @@
         if (c.category) cats.add(c.category);
         if (c.name) names.add(c.name);
       });
-      filterCategory.innerHTML = '<option value="">구분 전체</option>' +
-        Array.from(cats).map(c => `<option>${c}</option>`).join('');
+      filterCategory.innerHTML = '<option value="">구분 전체</option>' + Array.from(cats).map(c => `<option value="${c}">${c}</option>`).join('');
       nameListEl.innerHTML = Array.from(names).map(n => `<option value="${n}"></option>`).join('');
-    }
-
-    function courseMatchesFilters(c) {
-      if (filterCategory.value && c.category !== filterCategory.value) return false;
-      if (filterName.value && !String(c.name || '').includes(filterName.value.trim())) return false;
-      if (filterDay.value) {
-        const t = parseTime(c.time || '');
-        if (!t || t.day !== filterDay.value) return false;
-      }
-      if (filterGrade.value) {
-        const g = parseInt(filterGrade.value,10);
-        if ((c.minGrade && g < c.minGrade) || (c.maxGrade && g > c.maxGrade)) return false;
-      }
-      if (filterTeacher.value && !String(c.teacher || '').includes(filterTeacher.value.trim())) return false;
-      return true;
     }
 
     filterCategory.addEventListener('change', renderList);
@@ -265,6 +260,18 @@
     filterDay.addEventListener('change', renderList);
     filterGrade.addEventListener('change', renderList);
     filterTeacher.addEventListener('input', renderList);
+
+    function courseMatchesFilters(c) {
+      if (filterCategory.value && c.category !== filterCategory.value) return false;
+      if (filterName.value && !(c.name || '').includes(filterName.value.trim())) return false;
+      if (filterDay.value && c.day !== filterDay.value) return false;
+      if (filterGrade.value) {
+        const g = parseInt(filterGrade.value, 10);
+        if ((c.minGrade && g < c.minGrade) || (c.maxGrade && g > c.maxGrade)) return false;
+      }
+      if (filterTeacher.value && !(c.teacher || '').includes(filterTeacher.value.trim())) return false;
+      return true;
+    }
 
     function renderAll() {
       renderList();
@@ -283,66 +290,65 @@
       }
       entries.forEach(([id, c]) => {
         if (!courseMatchesFilters(c)) return;
-        const t = parseTime(c.time || '');
-        const day = t ? t.day : '';
-        const timeRange = t ? `${t.start}~${t.end}교시` : (c.time || '');
+        const tr = document.createElement('tr');
         const range = (c.minGrade || c.maxGrade) ? `${c.minGrade || ''}~${c.maxGrade || ''}학년` : '';
         const cap = c.capacity || 0;
         const appliedCount = c.appliedCount || 0;
-        const waitCount = c.waitCount || 0;
-        const mine = myApplied[id];
-        const myStatus = mine ? mine.status : null;
+        const my = myApplied[id];
 
         let statusText = '';
         let btnLabel = '';
         let btnClass = '';
         let disabled = false;
 
-        if (myStatus === 'OK') {
-          statusText = '신청 완료';
-          btnLabel = '신청 취소';
-          btnClass = 'cancel';
-        } else if (myStatus === 'WAIT') {
-          statusText = '대기 신청';
-          btnLabel = '대기 취소';
-          btnClass = 'cancel';
+        if (my) {
+          if (my.status === 'WAIT') {
+            statusText = '대기 신청';
+            btnLabel = '대기 취소';
+            btnClass = 'btn-cancel';
+          } else {
+            statusText = '신청 완료';
+            btnLabel = '신청 취소';
+            btnClass = 'btn-cancel';
+          }
         } else {
-          if (cap && appliedCount >= cap) {
-            statusText = waitCount ? `대기 ${waitCount}명` : '대기 가능';
+          if (settings && !isWithinApplyPeriod()) {
+            statusText = '신청 기간 아님';
+            btnLabel = '신청 불가';
+            btnClass = 'btn-disabled';
+            disabled = true;
+          } else if (cap && appliedCount >= cap) {
+            statusText = '정원 마감 (대기 가능)';
             btnLabel = '대기 신청';
-            btnClass = 'apply';
+            btnClass = 'btn-apply';
           } else {
             statusText = '신청 가능';
             btnLabel = '신청';
-            btnClass = 'apply';
+            btnClass = 'btn-apply';
           }
         }
 
-        const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${c.category || ''}</td>
           <td>${c.name || ''}</td>
-          <td>${day}</td>
-          <td>${timeRange}</td>
+          <td>${c.day || ''}</td>
+          <td>${c.time || ''}</td>
           <td>${range}</td>
           <td>${c.teacher || ''}</td>
           <td>${cap || '-'}</td>
-          <td>${appliedCount}${waitCount ? ' / 대기 ' + waitCount : ''}</td>
+          <td>${appliedCount}</td>
           <td>${statusText}</td>
-          <td><button class="${btnClass}" data-id="${id}">${btnLabel}</button></td>
+          <td><button class="${btnClass}" data-id="${id}" ${disabled ? 'disabled' : ''}>${btnLabel}</button></td>
         `;
         const btn = tr.querySelector('button');
-        if (myStatus === 'OK' || myStatus === 'WAIT' || btnClass === 'apply') {
+        if (!disabled) {
           btn.addEventListener('click', () => {
-            if (myStatus === 'OK' || myStatus === 'WAIT') {
-              cancelCourse(id);
+            if (my) {
+              cancelCourse(id, my);
             } else {
-              applyCourse(id);
+              applyCourse(id, cap && appliedCount >= cap);
             }
           });
-        } else {
-          btn.disabled = true;
-          btn.classList.add('disabled');
         }
         tbodyList.appendChild(tr);
       });
@@ -360,211 +366,229 @@
       ids.forEach(id => {
         const c = allCourses[id];
         if (!c) return;
-        const mine = myApplied[id];
-        const t = parseTime(c.time || '');
-        const day = t ? t.day : '';
-        const timeRange = t ? `${t.start}~${t.end}교시` : (c.time || '');
         const range = (c.minGrade || c.maxGrade) ? `${c.minGrade || ''}~${c.maxGrade || ''}학년` : '';
-        let statusLabel = '신청 완료';
-        if (mine && mine.status === 'WAIT') statusLabel = '대기 신청';
+        const my = myApplied[id];
+        const statusText = my.status === 'WAIT' ? '대기 신청' : '신청 완료';
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${c.category || ''}</td>
           <td>${c.name || ''}</td>
-          <td>${day}</td>
-          <td>${timeRange}</td>
+          <td>${c.day || ''}</td>
+          <td>${c.time || ''}</td>
           <td>${range}</td>
           <td>${c.teacher || ''}</td>
-          <td>${statusLabel}</td>
-          <td><button class="cancel" data-id="${id}">취소</button></td>
+          <td>${statusText}</td>
+          <td><button class="btn-cancel" data-id="${id}">취소</button></td>
         `;
-        tr.querySelector('button').addEventListener('click', () => cancelCourse(id));
+        tr.querySelector('button').addEventListener('click', () => cancelCourse(id, my));
         tbodyMy.appendChild(tr);
       });
     }
 
+    function buildTimetableSlots() {
+      // 13:00~13:40 / 13:40~14:20 / 14:20~15:00 등 40분 단위 예시
+      timetableBody.innerHTML = '';
+      const baseTimes = [
+        '13:00~13:40',
+        '13:40~14:20',
+        '14:20~15:00',
+        '15:00~15:40'
+      ];
+      baseTimes.forEach(t => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${t}</td>
+          <td></td><td></td><td></td><td></td><td></td>
+        `;
+        timetableBody.appendChild(tr);
+      });
+    }
+
     function renderTimetable() {
-      for (let r of timetableBody.rows) {
-        for (let i=1; i<r.cells.length; i++) r.cells[i].textContent = '';
-      }
-      const ids = Object.keys(myApplied);
-      ids.forEach(id => {
-        const mine = myApplied[id];
-        if (!mine || mine.status !== 'OK') return; // 대기는 시간표에 표시하지 않음
-        const c = allCourses[id];
+      buildTimetableSlots();
+      const dayIndex = { '월':1, '화':2, '수':3, '목':4, '금':5 };
+      Object.entries(myApplied).forEach(([courseId, my]) => {
+        const c = allCourses[courseId];
         if (!c) return;
-        const t = parseTime(c.time || '');
+        if (my.status !== 'OK') return; // 실제 수업만 반영
+        const t = parseTimeRange(c.time || '');
         if (!t) return;
-        const dayIndex = { '월':1,'화':2,'수':3,'목':4,'금':5 }[t.day];
-        if (!dayIndex) return;
-        for (let p=t.start; p<=t.end; p++) {
-          const row = timetableBody.rows[p-1];
-          if (!row) continue;
-          const cell = row.cells[dayIndex];
-          cell.textContent = cell.textContent ? cell.textContent + '/' + (c.name || '') : (c.name || '');
+        const col = dayIndex[c.day];
+        if (!col) return;
+        // 단순히 시작 시간이 같은 슬롯에 표시
+        for (let row of timetableBody.rows) {
+          const slotStr = row.cells[0].textContent;
+          const slot = parseTimeRange(slotStr);
+          if (!slot) continue;
+          if (slot.start === t.start) {
+            const cell = row.cells[col];
+            cell.textContent = cell.textContent ? cell.textContent + '/' + (c.name || '') : (c.name || '');
+          }
         }
       });
     }
 
-    function calcCurrentFreeHours() {
-      // 무상 과목의 신청 완료(OK) 시간 합계
-      let total = 0;
-      Object.entries(myApplied).forEach(([id, mine]) => {
-        if (!mine || mine.status !== 'OK') return;
-        const c = allCourses[id];
-        if (!c || c.category !== '무상') return;
-        const t = parseTime(c.time || '');
-        if (!t) return;
-        total += (t.end - t.start + 1);
-      });
-      return total;
+    function parseApplyDateTime(str) {
+      if (!str) return null;
+      const [d, t] = str.split(' ');
+      if (!d || !t) return null;
+      const [y, m, day] = d.split('-').map(v => parseInt(v,10));
+      const [hh, mm] = t.split(':').map(v => parseInt(v,10));
+      if (!y || !m || !day || isNaN(hh) || isNaN(mm)) return null;
+      return new Date(y, m-1, day, hh, mm);
     }
 
-    function hasTimeConflict(courseId) {
-      const target = allCourses[courseId];
-      if (!target) return false;
-      const t0 = parseTime(target.time || '');
-      if (!t0) return false;
-      let conflictName = null;
-      Object.entries(myApplied).forEach(([id, mine]) => {
-        if (!mine || mine.status !== 'OK') return; // 이미 신청 완료된 과목만 비교
-        const c = allCourses[id];
-        if (!c) return;
-        const t = parseTime(c.time || '');
-        if (!t || t.day !== t0.day) return;
-        const overlap = Math.max(t.start, t0.start) <= Math.min(t.end, t0.end);
-        if (overlap) conflictName = c.name || '';
-      });
-      return conflictName;
+    function isWithinApplyPeriod() {
+      const s = parseApplyDateTime(settings.applyStart);
+      const e = parseApplyDateTime(settings.applyEnd);
+      const now = new Date();
+      if (s && now < s) return false;
+      if (e && now > e) return false;
+      return true;
     }
 
-    function applyCourse(courseId) {
-      if (!student) return;
-      const course = allCourses[courseId];
-      if (!course) return;
-
+    async function applyCourse(courseId, asWait) {
       msgEl.textContent = '';
-
-      // 시간 겹침 체크
-      const conflictName = hasTimeConflict(courseId);
-      if (conflictName) {
-        msgEl.textContent = `이미 같은 시간대에 신청한 과목(${conflictName})이 있습니다.`;
+      const course = allCourses[courseId];
+      if (!course) {
+        msgEl.textContent = '과목 정보를 찾을 수 없습니다.';
+        return;
+      }
+      if (!isWithinApplyPeriod()) {
+        msgEl.textContent = '현재는 신청 기간이 아닙니다.';
         return;
       }
 
-      // 무상 주 10시간 제한
+      // 시간 겹침 체크 (신청 완료 및 대기 포함)
+      const newTime = parseTimeRange(course.time || '');
+      if (!newTime) {
+        msgEl.textContent = '과목 시간 정보가 올바르지 않습니다.';
+        return;
+      }
+      for (const [id, my] of Object.entries(myApplied)) {
+        const c = allCourses[id];
+        if (!c) continue;
+        if (c.day !== course.day) continue;
+        const t = parseTimeRange(c.time || '');
+        if (!t) continue;
+        const a1 = newTime.start, b1 = newTime.end;
+        const a2 = t.start, b2 = t.end;
+        if (!(b1 <= a2 || b2 <= a1)) {
+          msgEl.textContent = '이미 신청한 프로그램과 시간이 겹쳐 신청할 수 없습니다.';
+          return;
+        }
+      }
+
+      // 무상 10시간 제한 (OK 상태만 합산)
       if (course.category === '무상') {
-        const t = parseTime(course.time || '');
-        if (t) {
-          const cur = calcCurrentFreeHours();
-          const add = (t.end - t.start + 1);
-          if (cur + add > 10) {
-            msgEl.textContent = '무상 프로그램은 주 10시간까지만 신청할 수 있습니다.';
+        let totalMinutes = 0;
+        for (const [id, my] of Object.entries(myApplied)) {
+          if (my.status !== 'OK') continue;
+          const c = allCourses[id];
+          if (!c || c.category !== '무상') continue;
+          const t = parseTimeRange(c.time || '');
+          if (!t) continue;
+          totalMinutes += (t.end - t.start);
+        }
+        const tNew = parseTimeRange(course.time || '');
+        if (tNew) {
+          totalMinutes += (tNew.end - tNew.start);
+        }
+        const hours = minutesToFreeHours(totalMinutes);
+        if (hours > 10) {
+          msgEl.textContent = '무상 프로그램은 주 10시간까지만 신청할 수 있습니다.';
+          return;
+        }
+      }
+
+      const courseRef = ref(db, 'courses/' + courseId);
+      const appliedByStudentRef = ref(db, 'appliedByStudent/' + studentKey + '/' + courseId);
+      const appliedListRef = ref(db, 'courseApplied/' + courseId + '/' + studentKey);
+
+      try {
+        await runTransaction(courseRef, (cur) => {
+          if (!cur) return cur;
+          const cap = cur.capacity || 0;
+          const appliedCount = cur.appliedCount || 0;
+          const waitCount = cur.waitCount || 0;
+          if (!asWait) {
+            if (cap && appliedCount >= cap) {
+              // 정원 가득 → 대기로 전환
+              cur.waitCount = waitCount + 1;
+              cur.appliedCount = appliedCount;
+              cur._applyStatus = 'WAIT';
+            } else {
+              cur.appliedCount = appliedCount + 1;
+              cur.waitCount = waitCount;
+              cur._applyStatus = 'OK';
+            }
+          } else {
+            // 강제로 대기 신청
+            cur.waitCount = waitCount + 1;
+            cur._applyStatus = 'WAIT';
+          }
+          return cur;
+        }).then(async (res) => {
+          const committed = res.committed;
+          const val = res.snapshot.val();
+          if (!committed || !val) {
+            msgEl.textContent = '신청 처리 중 문제가 발생했습니다.';
             return;
           }
-        }
-      }
-
-      const courseRef = ref(db, 'courses/' + courseId);
-      const appliedByStudentRef = ref(db, 'appliedByStudent/' + encodeURIComponent(student.name) + '/' + courseId);
-      const appliedListRef = ref(db, 'courseApplied/' + courseId + '/' + encodeURIComponent(student.name));
-
-      let finalStatus = 'OK';
-
-      runTransaction(courseRef, (c) => {
-        if (!c) return c;
-        const capacity = c.capacity || 0;
-        const appliedCount = c.appliedCount || 0;
-        const waitCount = c.waitCount || 0;
-        if (capacity && appliedCount >= capacity) {
-          // 대기
-          finalStatus = 'WAIT';
-          c.waitCount = waitCount + 1;
-        } else {
-          // 정상 신청
-          finalStatus = 'OK';
-          c.appliedCount = appliedCount + 1;
-        }
-        return c;
-      }).then((res) => {
-        if (!res.committed || !res.snapshot.exists()) {
-          msgEl.textContent = '신청 처리 중 오류가 발생했습니다.';
-          return;
-        }
-        const payload = {
-          grade: student.grade,
-          class: student.class,
-          name: student.name,
-          category: course.category || '',
-          ts: Date.now(),
-          status: finalStatus
-        };
-        return Promise.all([
-          set(appliedByStudentRef, payload),
-          set(appliedListRef, payload)
-        ]);
-      }).then(() => {
-        if (finalStatus === 'OK') {
-          msgEl.textContent = '신청이 완료되었습니다.';
-        } else {
-          msgEl.textContent = '정원이 가득 차 대기 신청으로 접수되었습니다.';
-        }
-      }).catch((e) => {
+          const status = val._applyStatus || 'OK';
+          delete val._applyStatus;
+          const payload = {
+            grade: student.grade,
+            class: student.class,
+            name: student.name,
+            status,
+            ts: Date.now()
+          };
+          await Promise.all([
+            set(appliedByStudentRef, payload),
+            set(appliedListRef, payload)
+          ]);
+          msgEl.textContent = status === 'WAIT' ? '대기 신청이 완료되었습니다.' : '신청이 완료되었습니다.';
+        });
+      } catch (e) {
         console.error(e);
         msgEl.textContent = '신청 중 오류가 발생했습니다.';
-      });
+      }
     }
 
-    function cancelCourse(courseId) {
-      if (!student) return;
-      const mine = myApplied[courseId];
-      if (!mine) return;
-
-      // 취소 마감일 체크
-      if (cancelDeadline) {
-        const today = new Date();
-        const limit = new Date(cancelDeadline + 'T23:59:59');
-        if (today > limit) {
-          msgEl.textContent = '취소 마감일이 지나 신청을 취소할 수 없습니다.';
-          return;
-        }
-      }
-
+    async function cancelCourse(courseId, myInfo) {
       if (!confirm('이 과목 신청을 취소하시겠습니까?')) return;
       msgEl.textContent = '';
-
       const courseRef = ref(db, 'courses/' + courseId);
-      const appliedByStudentRef = ref(db, 'appliedByStudent/' + encodeURIComponent(student.name) + '/' + courseId);
-      const appliedListRef = ref(db, 'courseApplied/' + courseId + '/' + encodeURIComponent(student.name));
+      const appliedByStudentRef = ref(db, 'appliedByStudent/' + studentKey + '/' + courseId);
+      const appliedListRef = ref(db, 'courseApplied/' + courseId + '/' + studentKey);
 
-      const wasStatus = mine.status || 'OK';
-
-      runTransaction(courseRef, (c) => {
-        if (!c) return c;
-        if (wasStatus === 'OK') {
-          const appliedCount = c.appliedCount || 0;
-          c.appliedCount = appliedCount > 0 ? appliedCount - 1 : 0;
-        } else if (wasStatus === 'WAIT') {
-          const waitCount = c.waitCount || 0;
-          c.waitCount = waitCount > 0 ? waitCount - 1 : 0;
-        }
-        return c;
-      }).then(() => {
-        return Promise.all([
+      try {
+        await runTransaction(courseRef, (cur) => {
+          if (!cur) return cur;
+          const appliedCount = cur.appliedCount || 0;
+          const waitCount = cur.waitCount || 0;
+          if (myInfo.status === 'WAIT') {
+            cur.waitCount = waitCount > 0 ? waitCount - 1 : 0;
+          } else {
+            cur.appliedCount = appliedCount > 0 ? appliedCount - 1 : 0;
+          }
+          return cur;
+        });
+        await Promise.all([
           remove(appliedByStudentRef),
           remove(appliedListRef)
         ]);
-      }).then(() => {
         msgEl.textContent = '신청이 취소되었습니다.';
-      }).catch((e) => {
+      } catch (e) {
         console.error(e);
         msgEl.textContent = '취소 중 오류가 발생했습니다.';
-      });
+      }
     }
 
     loadStudent();
     if (student) {
-      watchData();
+      loadData();
     }
   </script>
 </body>
