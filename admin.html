@@ -32,6 +32,7 @@
       table { display:block; overflow-x:auto; }
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -449,18 +450,7 @@
       }
     }
 
-    downloadExcelBtn.addEventListener('click', async () => {
-      if (!currentCourseIdForStudents) return;
-      try {
-        const appliedRef = ref(db, 'courseApplied/' + currentCourseIdForStudents);
-        const snap = await get(appliedRef);
-        const data = snap.val() || {};
-        const list = Object.values(data);
-        list.sort((a, b) => {
-          if ((a.grade || 0) !== (b.grade || 0)) return (a.grade || 0) - (b.grade || 0);
-          if ((a.class || 0) !== (b.class || 0)) return (a.class || 0) - (b.class || 0);
-          return (a.name || '').localeCompare(b.name || '');
-        });
+    
 
         const now = new Date();
         const year = now.getFullYear();
@@ -497,6 +487,99 @@
         alert('출석부 생성 중 오류가 발생했습니다.');
       }
     });
-  </script>
+  
+// ===============================
+// XLSX 출석부 생성 (결재란 포함)
+// 기준: 2026년 3월, 과목 요일만 생성
+// ===============================
+const ATT_YEAR = 2026;
+const ATT_MONTH = 3;
+
+function kDayToJsDay(k) {
+  const map = { '일':0,'월':1,'화':2,'수':3,'목':4,'금':5,'토':6 };
+  return map[k] ?? null;
+}
+
+function getDatesInMonthByWeekday(year, month, jsDay) {
+  const dates = [];
+  const last = new Date(year, month, 0).getDate();
+  for (let d=1; d<=last; d++) {
+    const dt = new Date(year, month-1, d);
+    if (dt.getDay() === jsDay) dates.push(d);
+  }
+  return dates;
+}
+
+function borderAll() {
+  return {
+    top:{style:"thin"}, bottom:{style:"thin"},
+    left:{style:"thin"}, right:{style:"thin"}
+  };
+}
+
+function buildAttendanceXlsx(course, students) {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([[]]);
+
+  const baseCols = ["순번","학년","반","번호","이름","연락처"];
+  const jsDay = kDayToJsDay(course.day);
+  const dateNums = jsDay===null ? [] : getDatesInMonthByWeekday(ATT_YEAR, ATT_MONTH, jsDay);
+  const totalCols = baseCols.length + dateNums.length + 1;
+  const lastCol = totalCols - 1;
+
+  ws["!merges"] = [];
+
+  ws["A3"] = { v: `${course.name} 출석부`, t:"s", s:{ font:{bold:true,sz:16}, alignment:{horizontal:"center"} } };
+  ws["!merges"].push({ s:{r:2,c:0}, e:{r:2,c:lastCol-3} });
+
+  ["강사","실장","교감"].forEach((t,i)=>{
+    const col = lastCol-2+i;
+    ws[XLSX.utils.encode_cell({r:1,c:col})] = { v:t, t:"s", s:{border:borderAll(),alignment:{horizontal:"center"}} };
+    ws[XLSX.utils.encode_cell({r:2,c:col})] = { v:"", t:"s", s:{border:borderAll()} };
+  });
+
+  baseCols.forEach((h,i)=>{
+    ws[XLSX.utils.encode_cell({r:4,c:i})] = { v:h, t:"s", s:{border:borderAll(),font:{bold:true}} };
+  });
+  dateNums.forEach((d,i)=>{
+    ws[XLSX.utils.encode_cell({r:4,c:baseCols.length+i})] = { v:`${ATT_MONTH}/${d}`, t:"s", s:{border:borderAll(),font:{bold:true}} };
+  });
+  ws[XLSX.utils.encode_cell({r:4,c:lastCol})] = { v:"비고", t:"s", s:{border:borderAll(),font:{bold:true}} };
+
+  ["날짜","출석","귀가"].forEach((label,idx)=>{
+    const r = 5+idx;
+    ws[XLSX.utils.encode_cell({r,c:0})] = { v:label, t:"s", s:{border:borderAll()} };
+    for(let c=1;c<=lastCol;c++){
+      ws[XLSX.utils.encode_cell({r,c})] = { v:"", t:"s", s:{border:borderAll()} };
+    }
+  });
+
+  let r = 8;
+  students.forEach((s,i)=>{
+    const row = [i+1, s.grade||"", s.class||"", s.number||"", s.name||"", ""];
+    row.forEach((v,c)=>{
+      ws[XLSX.utils.encode_cell({r,c})] = { v, t:"s", s:{border:borderAll()} };
+    });
+    for(let c=baseCols.length;c<=lastCol;c++){
+      ws[XLSX.utils.encode_cell({r,c})] = { v:"", t:"s", s:{border:borderAll()} };
+    }
+    r++;
+  });
+
+  XLSX.utils.book_append_sheet(wb, ws, "출석부");
+  return wb;
+}
+
+downloadExcelBtn.addEventListener('click', async () => {
+  if (!currentCourseIdForStudents) return;
+  const cSnap = await get(ref(db, 'courses/' + currentCourseIdForStudents));
+  const aSnap = await get(ref(db, 'courseApplied/' + currentCourseIdForStudents));
+  const course = cSnap.val();
+  const students = Object.values(aSnap.val() || {});
+  const wb = buildAttendanceXlsx(course, students);
+  XLSX.writeFile(wb, `${course.name}_출석부.xlsx`);
+});
+
+</script>
 </body>
 </html>
