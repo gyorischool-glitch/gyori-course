@@ -1,1 +1,244 @@
-PLEASE USE THE courses.html CODE PROVIDED IN THE PREVIOUS MESSAGE
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>수강신청</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    body { font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; margin:0; background:#f5f7fb; }
+    .wrap { max-width:1200px; margin:20px auto; background:#fff; border-radius:12px; padding:20px; box-shadow:0 8px 20px rgba(0,0,0,.06); }
+    .topbar { display:flex; justify-content:space-between; align-items:center; }
+    h2 { margin:0; }
+    button { padding:8px 12px; border-radius:8px; border:none; font-weight:700; cursor:pointer; }
+    .logout { background:#e5e7eb; }
+    .tabs { display:flex; gap:8px; margin:16px 0; }
+    .tab { padding:8px 14px; border-radius:999px; border:1px solid #cbd5e1; background:#fff; cursor:pointer; }
+    .tab.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+    .msg { margin:12px 0; font-weight:700; color:#1e293b; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { border-bottom:1px solid #e5e7eb; padding:8px; font-size:14px; }
+    th { background:#f8fafc; }
+    .btn { padding:6px 10px; border-radius:8px; font-size:13px; }
+    .apply { background:#2563eb; color:#fff; }
+    .cancel { background:#ef4444; color:#fff; }
+    .disabled { background:#cbd5e1; color:#475569; cursor:not-allowed; }
+    .pill { padding:4px 10px; border-radius:999px; font-size:12px; background:#eef2ff; font-weight:700; }
+    .hidden { display:none; }
+  </style>
+
+  <script type="module">
+    import { db } from './firebase-config.js';
+    import { ref, onValue, runTransaction, get } 
+      from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+
+    /* =========================
+       공통 유틸
+    ========================= */
+    function parseDateTime(d, t) {
+      if (!d) return null;
+      const time = t || '00:00';
+      return new Date(`${d}T${time}:00`);
+    }
+
+    function normalizeCategory(cat) {
+      if ((cat||'').includes('무상')) return 'free';
+      return 'paid';
+    }
+
+    /* =========================
+       서버 시간 (서울 기준)
+    ========================= */
+    let serverOffset = 0;
+    function serverNow() {
+      return new Date(Date.now() + serverOffset);
+    }
+
+    onValue(ref(db, '.info/serverTimeOffset'), snap => {
+      serverOffset = snap.val() || 0;
+      setupCountdown();
+      renderList();
+    });
+
+    /* =========================
+       로그인 정보
+    ========================= */
+    const student = JSON.parse(localStorage.getItem('gyori_student') || 'null');
+    if (!student) {
+      alert('로그인이 필요합니다.');
+      location.href = 'login.html';
+    }
+
+    document.getElementById('logoutBtn').onclick = () => {
+      if (!confirm('로그아웃 하시겠습니까?')) return;
+      localStorage.removeItem('gyori_student');
+      location.href = 'login.html';
+    };
+
+    document.getElementById('studentInfo').textContent =
+      `${student.name} (${student.grade}학년)`;
+
+    /* =========================
+       데이터 상태
+    ========================= */
+    let courses = {};
+    let myApplies = {};
+    let settings = {};
+
+    /* =========================
+       신청기간 판단
+    ========================= */
+    function getApplyPeriodByCourse(course) {
+      const key = normalizeCategory(course.category);
+      const ap = settings.applyPeriod?.[key];
+      if (!ap) return { start:null, end:null };
+      return {
+        start: parseDateTime(ap.startDate, ap.startTime),
+        end: parseDateTime(ap.endDate, ap.endTime)
+      };
+    }
+
+    function isInApplyPeriod(course) {
+      const { start, end } = getApplyPeriodByCourse(course);
+      const now = serverNow();
+      if (start && now < start) return false;
+      if (end && now > end) return false;
+      return true;
+    }
+
+    /* =========================
+       카운트다운 (3분)
+    ========================= */
+    let countdownTimer = null;
+
+    function setupCountdown() {
+      if (countdownTimer) clearInterval(countdownTimer);
+
+      const now = serverNow();
+      const targets = [];
+
+      ['free','paid'].forEach(k => {
+        const p = settings.applyPeriod?.[k];
+        if (!p?.startDate) return;
+        const start = parseDateTime(p.startDate, p.startTime);
+        if (start && start > now) {
+          targets.push({ label: k==='free'?'무상':'유상', start });
+        }
+      });
+
+      if (!targets.length) return;
+
+      targets.sort((a,b)=>a.start-b.start);
+      const next = targets[0];
+      const diff = Math.floor((next.start-now)/1000);
+
+      if (diff > 180) return;
+
+      const msg = document.getElementById('msg');
+      countdownTimer = setInterval(()=>{
+        const left = Math.floor((next.start-serverNow())/1000);
+        if (left<=0) {
+          location.reload();
+          return;
+        }
+        msg.textContent =
+          `${next.label} 수강신청이 ${Math.floor(left/60)}분 ${left%60}초 후 시작됩니다.`;
+      },1000);
+    }
+
+    /* =========================
+       렌더링
+    ========================= */
+    const tbody = document.getElementById('tbody');
+
+    function renderList() {
+      if (!courses || !Object.keys(courses).length) return;
+      tbody.innerHTML = '';
+
+      const visible = Object.entries(courses)
+        .filter(([id,c])=>isInApplyPeriod(c));
+
+      if (!visible.length) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="10">현재는 수강신청 기간이 아닙니다.</td>`;
+        tbody.appendChild(tr);
+        setupCountdown();
+        return;
+      }
+
+      visible.forEach(([id,c])=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${c.category}</td>
+          <td>${c.name}</td>
+          <td>${c.day}</td>
+          <td>${c.time}</td>
+          <td>${c.minGrade}~${c.maxGrade}</td>
+          <td>${c.teacher}</td>
+          <td>${c.capacity}</td>
+          <td>${c.appliedCount||0}</td>
+          <td><span class="pill">${myApplies[id]?'신청':'가능'}</span></td>
+          <td>
+            <button class="btn ${myApplies[id]?'cancel':'apply'}">
+              ${myApplies[id]?'취소':'신청'}
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    /* =========================
+       Firebase 구독
+    ========================= */
+    onValue(ref(db,'courses'), snap=>{
+      courses = snap.val()||{};
+      renderList();
+    });
+
+    onValue(ref(db,`applies/${student.key}`), snap=>{
+      myApplies = snap.val()||{};
+      renderList();
+    });
+
+    onValue(ref(db,'settings'), snap=>{
+      settings = snap.val()||{};
+      setupCountdown();
+      renderList();
+    });
+
+  </script>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <h2>수강신청</h2>
+      <div>
+        <span id="studentInfo"></span>
+        <button id="logoutBtn" class="logout">로그아웃</button>
+      </div>
+    </div>
+
+    <div id="msg" class="msg"></div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>구분</th>
+          <th>과목명</th>
+          <th>요일</th>
+          <th>시간</th>
+          <th>학년</th>
+          <th>강사</th>
+          <th>정원</th>
+          <th>신청인원</th>
+          <th>상태</th>
+          <th>신청</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</body>
+</html>
