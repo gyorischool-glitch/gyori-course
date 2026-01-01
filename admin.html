@@ -1,449 +1,119 @@
-
-    <!-- 신청기간 설정 (구분별: 무상/유상) -->
-    <div class="card" style="margin-top:14px;">
-      <div class="card-title">수강신청 기간 설정 (구분별)</div>
-      <div class="small" style="margin-top:6px;">※ 학생 페이지는 서버 시간(서울 기준)으로 판단합니다.</div>
-
-      <table class="table" style="margin-top:10px;">
-        <thead>
-          <tr>
-            <th style="width:80px;">구분</th>
-            <th>시작일</th>
-            <th>시작시간</th>
-            <th>마감일</th>
-            <th>마감시간</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><b>무상</b></td>
-            <td><input type="date" id="freeStartDate"></td>
-            <td><input type="time" id="freeStartTime"></td>
-            <td><input type="date" id="freeEndDate"></td>
-            <td><input type="time" id="freeEndTime"></td>
-          </tr>
-          <tr>
-            <td><b>유상</b></td>
-            <td><input type="date" id="paidStartDate"></td>
-            <td><input type="time" id="paidStartTime"></td>
-            <td><input type="date" id="paidEndDate"></td>
-            <td><input type="time" id="paidEndTime"></td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-        <button id="saveApplyPeriodBtn" class="btn primary">신청기간 저장</button>
-        <div id="applyPeriodMsg" class="msg"></div>
-      </div>
-    </div>
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>관리자 페이지 - 교리초 수강신청</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    body { font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; margin:0; padding:0; background:#f5f7fb; }
-    .wrap { max-width:1000px; margin:20px auto; background:#fff; border-radius:12px; padding:20px; box-shadow:0 8px 20px rgba(0,0,0,.06); }
-    h2 { margin:0 0 12px; font-size:20px; }
-    .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-size:14px; }
-    button { padding:6px 10px; border-radius:6px; border:none; cursor:pointer; font-size:13px; }
-    .logout { background:#ef4444; color:#fff; }
-    .btn { background:#2563eb; color:#fff; }
-    .btn-ghost { background:#e5e7eb; color:#111827; }
-    .small { font-size:12px; color:#6b7280; }
-    table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
-    th, td { border-bottom:1px solid #e5e7eb; padding:8px 6px; text-align:left; }
-    th { background:#f3f4f6; }
-    input, select { padding:6px 8px; border-radius:6px; border:1px solid #d1d5db; font-size:13px; }
-    .section { margin-top:18px; }
-    .row { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; align-items:center; }
-    .row > * { flex:0 0 auto; }
-    .msg { margin-top:6px; font-size:13px; color:#2563eb; }
-    @media (max-width: 768px) {
-      .wrap { max-width:100%; margin:0; border-radius:0; box-shadow:none; padding:12px; }
-      .topbar { flex-direction:column; align-items:flex-start; gap:4px; }
-      table { display:block; width:100%; overflow-x:auto; font-size:12px; }
-      th, td { white-space:nowrap; padding:6px 4px; }
-      button { padding:8px 10px; font-size:13px; }
+<meta charset="UTF-8">
+<title>관리자 페이지</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script type="module">
+import { auth, db } from './firebase-config.js';
+import { signOut } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+import { ref, onValue, push, update, remove, get } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+
+const coursesRef = ref(db, 'courses');
+let editingId = null;
+
+window.onload = () => {
+  logoutBtn.onclick = () => signOut(auth).then(()=>location.href='admin-login.html');
+
+  saveCourseBtn.onclick = async () => {
+    const data = {
+      name: name.value,
+      category: category.value,
+      day: day.value,
+      time: time.value,
+      minGrade: Number(minGrade.value),
+      maxGrade: Number(maxGrade.value),
+      teacher: teacher.value,
+      capacity: Number(capacity.value)
+    };
+
+    if (editingId) {
+      const snap = await get(ref(db, 'appliesByCourse/' + editingId));
+      if (snap.exists() && (day.value !== snap.val().day || time.value !== snap.val().time)) {
+        if (!confirm('요일/시간이 변경됩니다. 기존 신청자에게 영향을 줄 수 있습니다. 계속할까요?')) return;
+      }
+      await update(ref(db, 'courses/' + editingId), data);
+      editingId = null;
+    } else {
+      await push(coursesRef, data);
     }
-  </style>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    courseForm.reset();
+  };
+
+  onValue(coursesRef, snap => {
+    courseTable.innerHTML = '';
+    Object.entries(snap.val() || {}).forEach(([id, c]) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${c.name}</td>
+        <td>${c.category}</td>
+        <td>${c.day}</td>
+        <td>${c.time}</td>
+        <td>${c.teacher}</td>
+        <td>${c.capacity}</td>
+        <td id="count-${id}">0 / ${c.capacity}</td>
+        <td>
+          <button onclick="editCourse('${id}')">수정</button>
+          <button onclick="deleteCourse('${id}')">삭제</button>
+        </td>`;
+      courseTable.appendChild(tr);
+
+      onValue(ref(db, 'appliesByCourse/' + id), s => {
+        const count = s.exists() ? Object.keys(s.val()).length : 0;
+        document.getElementById('count-' + id).textContent = `${count} / ${c.capacity}`;
+      });
+    });
+  });
+};
+
+window.editCourse = (id) => {
+  editingId = id;
+  onValue(ref(db, 'courses/' + id), snap => {
+    const c = snap.val();
+    name.value = c.name;
+    category.value = c.category;
+    day.value = c.day;
+    time.value = c.time;
+    minGrade.value = c.minGrade;
+    maxGrade.value = c.maxGrade;
+    teacher.value = c.teacher;
+    capacity.value = c.capacity;
+  }, { onlyOnce: true });
+};
+
+window.deleteCourse = async (id) => {
+  if (!confirm('이 과목을 삭제하면 신청 데이터도 함께 삭제됩니다. 진행할까요?')) return;
+  await remove(ref(db, 'courses/' + id));
+  await remove(ref(db, 'appliesByCourse/' + id));
+};
+</script>
 </head>
 <body>
-  <div class="wrap">
-    <div class="topbar">
-      <div><strong>관리자 페이지</strong></div>
-      <button class="logout" id="logoutBtn">로그아웃</button>
-    </div>
-    <div class="small">과목 등록/수정 및 학생 신청 현황을 관리합니다. (구분: 무상/유상/예체능 등)</div>
+<h2>관리자 페이지</h2>
+<button id="logoutBtn">로그아웃</button>
 
-    <div class="section">
-      <h3>취소 마감일 설정</h3>
-      <div class="row">
-        <label>취소 마감일:
-          <input type="date" id="cancelDeadline" />
-        </label>
-        <button class="btn" id="saveCancelDeadline">저장</button>
-        <span class="small">※ 이 날짜 이후에는 학생이 스스로 신청 취소를 할 수 없습니다.</span>
-      </div>
-      <div class="msg" id="cancelMsg"></div>
-    </div>
+<h3>과목 등록 / 수정</h3>
+<form id="courseForm">
+<input id="name" placeholder="과목명">
+<input id="category" placeholder="구분">
+<input id="day" placeholder="요일">
+<input id="time" placeholder="시간">
+<input id="minGrade" placeholder="최소학년">
+<input id="maxGrade" placeholder="최대학년">
+<input id="teacher" placeholder="강사">
+<input id="capacity" placeholder="정원">
+<button type="button" id="saveCourseBtn">저장</button>
+</form>
 
-    <div class="section">
-      <h3>과목 등록</h3>
-      <div class="row">
-        <input id="cName" placeholder="과목명" style="min-width:120px;" />
-        <input id="cCategory" placeholder="구분(예: 무상)" style="width:110px;" />
-        <input id="cTime" placeholder="시간 예: 월 3~4교시" style="min-width:150px;" />
-        <input id="cMinG" placeholder="최소학년" style="width:80px;" />
-        <input id="cMaxG" placeholder="최대학년" style="width:80px;" />
-        <input id="cTeacher" placeholder="강사명" style="width:100px;" />
-        <input id="cCap" placeholder="정원" style="width:80px;" />
-        <button class="btn" id="addCourseBtn">과목 저장</button>
-      </div>
-      <div class="msg" id="courseMsg"></div>
-    </div>
-
-    <div class="section">
-      <h3>과목 목록</h3>
-      <table id="courseTable">
-        <thead>
-          <tr>
-            <th>과목명</th>
-            <th>구분</th>
-            <th>대상 학년</th>
-            <th>요일</th>
-            <th>시간</th>
-            <th>강사</th>
-            <th>정원</th>
-            <th>신청 인원</th>
-            <th>신청자 보기</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-
-    <div class="section">
-      <h3>선택 과목 신청자</h3>
-      <div class="small" id="selectedCourseInfo">아래 목록에서 과목을 선택하면 신청자가 보입니다.</div>
-      <div class="row">
-        <button id="downloadXlsxBtn" class="btn-ghost" disabled>출석부 엑셀 다운로드</button>
-      </div>
-      <table id="appliedTable">
-        <thead>
-          <tr>
-            <th>구분</th>
-            <th>학년</th>
-            <th>반</th>
-            <th>이름</th>
-            <th>상태</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
-
-  <script type="module">
-    import { app, db, auth } from './firebase-config.js';
-    import { signOut } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
-    import { ref, push, set, onValue, runTransaction, get } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
-
-    
-
-    // =========================
-    // 신청기간 설정 (구분별: 무상/유상)
-    // settings.applyPeriod.free / settings.applyPeriod.paid 로 저장
-    // 하위호환: settings.applyStart/applyEnd 는 무상 기준으로 함께 저장
-    // =========================
-    const settingsRef = ref(db, 'settings');
-
-    const freeStartDateEl = document.getElementById('freeStartDate');
-    const freeStartTimeEl = document.getElementById('freeStartTime');
-    const freeEndDateEl   = document.getElementById('freeEndDate');
-    const freeEndTimeEl   = document.getElementById('freeEndTime');
-
-    const paidStartDateEl = document.getElementById('paidStartDate');
-    const paidStartTimeEl = document.getElementById('paidStartTime');
-    const paidEndDateEl   = document.getElementById('paidEndDate');
-    const paidEndTimeEl   = document.getElementById('paidEndTime');
-
-    const applyPeriodMsgEl = document.getElementById('applyPeriodMsg');
-
-    function dtString(d, t) {
-      if (!d) return '';
-      const tt = t || '00:00';
-      return `${d} ${tt}`;
-    }
-
-    function parseOldDT(v) {
-      if (!v) return { date:'', time:'' };
-      const parts = v.split(' ');
-      return { date: parts[0] || '', time: parts[1] || '' };
-    }
-
-    onValue(settingsRef, snap => {
-      const s = snap.val() || {};
-      const ap = s.applyPeriod || {};
-
-      if (ap.free) {
-        freeStartDateEl.value = ap.free.startDate || '';
-        freeStartTimeEl.value = ap.free.startTime || '';
-        freeEndDateEl.value   = ap.free.endDate || '';
-        freeEndTimeEl.value   = ap.free.endTime || '';
-      } else if (s.applyStart || s.applyEnd) {
-        const st = parseOldDT(s.applyStart);
-        const et = parseOldDT(s.applyEnd);
-        freeStartDateEl.value = st.date;
-        freeStartTimeEl.value = st.time;
-        freeEndDateEl.value   = et.date;
-        freeEndTimeEl.value   = et.time;
-      }
-
-      if (ap.paid) {
-        paidStartDateEl.value = ap.paid.startDate || '';
-        paidStartTimeEl.value = ap.paid.startTime || '';
-        paidEndDateEl.value   = ap.paid.endDate || '';
-        paidEndTimeEl.value   = ap.paid.endTime || '';
-      }
-    });
-
-    document.getElementById('saveApplyPeriodBtn').addEventListener('click', async () => {
-      try {
-        const payload = {
-          applyPeriod: {
-            free: {
-              startDate: freeStartDateEl.value || '',
-              startTime: freeStartTimeEl.value || '',
-              endDate: freeEndDateEl.value || '',
-              endTime: freeEndTimeEl.value || ''
-            },
-            paid: {
-              startDate: paidStartDateEl.value || '',
-              startTime: paidStartTimeEl.value || '',
-              endDate: paidEndDateEl.value || '',
-              endTime: paidEndTimeEl.value || ''
-            }
-          },
-          // 하위호환(무상 기준)
-          applyStart: dtString(freeStartDateEl.value, freeStartTimeEl.value),
-          applyEnd: dtString(freeEndDateEl.value, freeEndTimeEl.value)
-        };
-
-        await update(settingsRef, payload);
-        applyPeriodMsgEl.textContent = '신청기간이 저장되었습니다.';
-        applyPeriodMsgEl.classList.remove('msg-error');
-      } catch(e) {
-        console.error(e);
-        applyPeriodMsgEl.textContent = '저장 중 오류가 발생했습니다.';
-        applyPeriodMsgEl.classList.add('msg-error');
-      }
-    });
-
-const logoutBtn = document.getElementById('logoutBtn');
-    const cancelDeadlineInput = document.getElementById('cancelDeadline');
-    const saveCancelDeadlineBtn = document.getElementById('saveCancelDeadline');
-    const cancelMsg = document.getElementById('cancelMsg');
-
-    const cName = document.getElementById('cName');
-    const cCategory = document.getElementById('cCategory');
-    const cTime = document.getElementById('cTime');
-    const cMinG = document.getElementById('cMinG');
-    const cMaxG = document.getElementById('cMaxG');
-    const cTeacher = document.getElementById('cTeacher');
-    const cCap = document.getElementById('cCap');
-    const courseMsg = document.getElementById('courseMsg');
-
-    const tbodyCourses = document.querySelector('#courseTable tbody');
-    const tbodyApplied = document.querySelector('#appliedTable tbody');
-    const selectedCourseInfo = document.getElementById('selectedCourseInfo');
-    const downloadXlsxBtn = document.getElementById('downloadXlsxBtn');
-
-    let selectedCourseId = null;
-    let selectedCourseObj = null;
-
-    logoutBtn.addEventListener('click', () => {
-      if (!confirm('로그아웃 하시겠습니까?')) return;
-      signOut(auth).then(() => {
-        location.href = 'admin-login.html';
-      }).catch(e => {
-        console.error(e);
-        alert('로그아웃 중 오류가 발생했습니다.');
-      });
-    });
-
-    const cancelDeadlineRef = ref(db, 'settings/cancelDeadline');
-    const coursesRef = ref(db, 'courses');
-
-    // 취소 마감일 로드
-    onValue(cancelDeadlineRef, (snap) => {
-      const v = snap.val();
-      if (v) {
-        cancelDeadlineInput.value = v;
-      } else {
-        cancelDeadlineInput.value = '';
-      }
-    });
-
-    saveCancelDeadlineBtn.addEventListener('click', () => {
-      const v = cancelDeadlineInput.value || null;
-      set(cancelDeadlineRef, v).then(() => {
-        cancelMsg.textContent = '취소 마감일이 저장되었습니다.';
-        setTimeout(() => cancelMsg.textContent = '', 2000);
-      }).catch(e => {
-        console.error(e);
-        cancelMsg.textContent = '저장 중 오류가 발생했습니다.';
-      });
-    });
-
-    function parseTime(str) {
-      if (!str) return null;
-      const m = str.match(/([월화수목금])\s*(\d+)~(\d+)교시?/);
-      if (!m) return null;
-      return { day: m[1], start: parseInt(m[2],10), end: parseInt(m[3],10) };
-    }
-
-    function addCourse() {
-      const name = cName.value.trim();
-      const category = cCategory.value.trim();
-      const time = cTime.value.trim();
-      const minGrade = parseInt(cMinG.value || '0', 10);
-      const maxGrade = parseInt(cMaxG.value || '0', 10);
-      const teacher = cTeacher.value.trim();
-      const cap = parseInt(cCap.value || '0', 10);
-
-      if (!name || !time) {
-        courseMsg.textContent = '과목명과 시간을 입력해 주세요.';
-        return;
-      }
-
-      const newRef = push(coursesRef);
-      runTransaction(newRef, cur => {
-        if (cur === null) {
-          return {
-            name,
-            category,
-            time,
-            minGrade,
-            maxGrade,
-            teacher,
-            capacity: cap || 0,
-            appliedCount: 0,
-            waitCount: 0
-          };
-        }
-        return cur;
-      }).then(() => {
-        courseMsg.textContent = '과목이 저장되었습니다.';
-        cName.value = '';
-        cCategory.value = '';
-        cTime.value = '';
-        cMinG.value = '';
-        cMaxG.value = '';
-        cTeacher.value = '';
-        cCap.value = '';
-      }).catch(e => {
-        console.error(e);
-        courseMsg.textContent = '저장 중 오류가 발생했습니다.';
-      });
-    }
-
-    document.getElementById('addCourseBtn').addEventListener('click', addCourse);
-
-    // 과목 목록 로드
-    onValue(coursesRef, (snap) => {
-      const data = snap.val() || {};
-      tbodyCourses.innerHTML = '';
-      Object.entries(data).forEach(([id, c]) => {
-        const t = parseTime(c.time || '');
-        const day = t ? t.day : '';
-        const timeRange = t ? `${t.start}~${t.end}교시` : (c.time || '');
-        const range = (c.minGrade || c.maxGrade) ? `${c.minGrade || ''}~${c.maxGrade || ''}학년` : '';
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${c.name || ''}</td>
-          <td>${c.category || ''}</td>
-          <td>${range}</td>
-          <td>${day}</td>
-          <td>${timeRange}</td>
-          <td>${c.teacher || ''}</td>
-          <td>${c.capacity || '-'}</td>
-          <td>${c.appliedCount || 0}${c.waitCount ? ' / 대기 ' + c.waitCount : ''}</td>
-          <td><button class="btn-ghost" data-id="${id}">보기</button></td>
-        `;
-        tr.querySelector('button').addEventListener('click', () => {
-          selectedCourseId = id;
-          selectedCourseObj = c;
-          selectedCourseInfo.textContent = `선택한 과목: ${c.name || ''} (${c.category || ''})`;
-          downloadXlsxBtn.disabled = false;
-          loadAppliedForCourse(id);
-        });
-        tbodyCourses.appendChild(tr);
-      });
-    });
-
-    function loadAppliedForCourse(courseId) {
-      const appliedRef = ref(db, 'courseApplied/' + courseId);
-      onValue(appliedRef, (snap) => {
-        const data = snap.val() || {};
-        const arr = Object.values(data);
-        arr.sort((a,b) => (a.grade || 0) - (b.grade || 0) || (a.class || '').localeCompare(b.class || '', 'ko') || (a.name || '').localeCompare(b.name || '', 'ko'));
-        tbodyApplied.innerHTML = '';
-        arr.forEach(stu => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${stu.category || ''}</td>
-            <td>${stu.grade || ''}</td>
-            <td>${stu.class || ''}</td>
-            <td>${stu.name || ''}</td>
-            <td>${stu.status === 'WAIT' ? '대기' : '신청'}</td>
-          `;
-          tbodyApplied.appendChild(tr);
-        });
-      });
-    }
-
-    downloadXlsxBtn.addEventListener('click', async () => {
-      if (!selectedCourseId || !selectedCourseObj) return;
-      try {
-        const appliedRef = ref(db, 'courseApplied/' + selectedCourseId);
-        const snap = await get(appliedRef);
-        const data = snap.val() || {};
-        const list = Object.values(data);
-        list.sort((a,b) => (a.grade || 0) - (b.grade || 0) || (a.class || '').localeCompare(b.class || '', 'ko') || (a.name || '').localeCompare(b.name || '', 'ko'));
-
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth() + 1;
-        const daysInMonth = new Date(year, month, 0).getDate();
-        const header = ["번호","학년","반","이름"];
-        for (let d=1; d<=daysInMonth; d++) {
-          header.push(`${month}/${d}`);
-        }
-        header.push("비고");
-
-        const aoa = [];
-        aoa.push(header);
-        list.forEach((stu, idx) => {
-          const row = [idx+1, stu.grade || '', stu.class || '', stu.name || ''];
-          for (let d=1; d<=daysInMonth; d++) row.push("");
-          row.push("");
-          aoa.push(row);
-        });
-
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(aoa);
-        XLSX.utils.book_append_sheet(wb, ws, "출석부");
-        const title = selectedCourseObj.name || '출석부';
-        XLSX.writeFile(wb, `${title}_출석부.xlsx`);
-      } catch (e) {
-        console.error(e);
-        alert('출석부 생성 중 오류가 발생했습니다.');
-      }
-    });
-  </script>
+<h3>과목 목록</h3>
+<table>
+<thead>
+<tr>
+<th>과목명</th><th>구분</th><th>요일</th><th>시간</th>
+<th>강사</th><th>정원</th><th>신청인원</th><th>관리</th>
+</tr>
+</thead>
+<tbody id="courseTable"></tbody>
+</table>
 </body>
 </html>
