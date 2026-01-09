@@ -1,1 +1,35 @@
-<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'><title>학생</title></head><body><h1>학생 페이지 (최종본)</h1></body></html>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>수강신청</title>
+</head>
+<body>
+
+<h1>수강신청</h1>
+<button id="logout">로그아웃</button>
+<ul id="courses"></ul>
+
+<script type="module">
+import { auth, db } from "./firebase-config.js";
+import { signOut } from
+ "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { collection, onSnapshot }
+ from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+logout.onclick = async () => {
+  await signOut(auth);
+  location.replace("login.html");
+};
+
+onSnapshot(collection(db, "courses"), snap => {
+  courses.innerHTML = "";
+  snap.forEach(d => {
+    const c = d.data();
+    courses.innerHTML += `<li>${c.type} | ${c.name} | ${c.day} ${c.time}</li>`;
+  });
+});
+</script>
+
+</body>
+</html>

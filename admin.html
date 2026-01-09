@@ -1,1 +1,59 @@
-<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'><title>관리자</title></head><body><h1>관리자 페이지 (최종본)</h1></body></html>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>관리자</title>
+</head>
+<body>
+
+<h1>관리자 페이지</h1>
+<button id="logout">로그아웃</button>
+
+<h2>과목 등록</h2>
+<input id="name" placeholder="과목명">
+<select id="type">
+  <option value="무상">무상</option>
+  <option value="유상">유상</option>
+</select>
+<input id="day" placeholder="요일 (예: 화)">
+<input id="time" placeholder="13:00~13:40">
+<input id="capacity" type="number" placeholder="정원">
+<button id="save">저장</button>
+
+<h2>과목 목록</h2>
+<ul id="list"></ul>
+
+<script type="module">
+import { auth, db } from "./firebase-config.js";
+import { signOut } from
+ "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import {
+  collection, addDoc, onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+logout.onclick = async () => {
+  await signOut(auth);
+  location.replace("admin-login.html");
+};
+
+save.onclick = async () => {
+  await addDoc(collection(db, "courses"), {
+    name: name.value,
+    type: type.value,
+    day: day.value,
+    time: time.value,
+    capacity: Number(capacity.value)
+  });
+};
+
+onSnapshot(collection(db, "courses"), snap => {
+  list.innerHTML = "";
+  snap.forEach(d => {
+    const c = d.data();
+    list.innerHTML += `<li>${c.type} | ${c.name} | ${c.day} ${c.time}</li>`;
+  });
+});
+</script>
+
+</body>
+</html>

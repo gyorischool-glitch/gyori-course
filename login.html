@@ -1,1 +1,31 @@
-<!DOCTYPE html><html><body><h2>학생 로그인</h2></body></html>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>학생 로그인</title>
+</head>
+<body>
+<h2>학생 로그인</h2>
+
+<input id="email" placeholder="이메일"><br>
+<input id="password" type="password" placeholder="비밀번호"><br>
+<button id="loginBtn">로그인</button>
+
+<script type="module">
+import { auth } from "./firebase-config.js";
+import { signInWithEmailAndPassword } from
+  "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+document.getElementById("loginBtn").onclick = async () => {
+  const email = email.value;
+  const pw = password.value;
+  try {
+    await signInWithEmailAndPassword(auth, email, pw);
+    location.replace("courses.html");
+  } catch (e) {
+    alert("로그인 실패");
+  }
+};
+</script>
+</body>
+</html>
