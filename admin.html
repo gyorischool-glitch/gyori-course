@@ -26,10 +26,16 @@
     .small { font-size:12px; color:#6b7280; margin-top:4px; }
     .msg { font-size:13px; margin-top:6px; color:#2563eb; }
     .msg-error { color:#ef4444; }
+    .period-grid { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; }
+    .period-card { border:1px solid #e5e7eb; background:#f9fafb; border-radius:10px; padding:12px; min-width:320px; }
+    .period-title { font-weight:700; font-size:13px; margin-bottom:6px; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .row > div { display:flex; flex-direction:column; gap:4px; }
     @media (max-width: 768px) {
       .wrap { max-width:100%; margin:0; border-radius:0; box-shadow:none; padding:12px; }
       .topbar { flex-direction:column; align-items:flex-start; gap:6px; }
       table { display:block; overflow-x:auto; }
+      .period-card { min-width:100%; }
     }
   </style>
 </head>
@@ -41,28 +47,64 @@
     </div>
 
     <div class="section">
-      <h3>수강신청 기간 설정</h3>
-      <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-        <div>
-          <label>시작일</label>
-          <input type="date" id="applyStartDate" />
+      <h3>수강신청 기간 설정 (무상/유상)</h3>
+
+      <div class="period-grid">
+        <div class="period-card">
+          <div class="period-title">무상 신청기간</div>
+          <div class="row">
+            <div>
+              <label>시작일</label>
+              <input type="date" id="freeStartDate" />
+            </div>
+            <div>
+              <label>시작시간(24H)</label>
+              <input type="time" id="freeStartTime" />
+            </div>
+            <div>
+              <label>마감일</label>
+              <input type="date" id="freeEndDate" />
+            </div>
+            <div>
+              <label>마감시간(24H)</label>
+              <input type="time" id="freeEndTime" />
+            </div>
+          </div>
+          <div id="freeInfo" class="small"></div>
         </div>
-        <div>
-          <label>시작시간</label>
-          <input type="time" id="applyStartTime" />
+
+        <div class="period-card">
+          <div class="period-title">유상 신청기간</div>
+          <div class="row">
+            <div>
+              <label>시작일</label>
+              <input type="date" id="paidStartDate" />
+            </div>
+            <div>
+              <label>시작시간(24H)</label>
+              <input type="time" id="paidStartTime" />
+            </div>
+            <div>
+              <label>마감일</label>
+              <input type="date" id="paidEndDate" />
+            </div>
+            <div>
+              <label>마감시간(24H)</label>
+              <input type="time" id="paidEndTime" />
+            </div>
+          </div>
+          <div id="paidInfo" class="small"></div>
         </div>
-        <div>
-          <label>마감일</label>
-          <input type="date" id="applyEndDate" />
+
+        <div style="display:flex; align-items:flex-end;">
+          <button id="saveApplyPeriodBtn" class="btn btn-primary" style="height:34px;">기간 저장</button>
         </div>
-        <div>
-          <label>마감시간</label>
-          <input type="time" id="applyEndTime" />
-        </div>
-        <button id="saveApplyPeriodBtn" class="btn btn-primary">기간 저장</button>
       </div>
-      <div id="applyPeriodInfo" class="small"></div>
+
       <div id="applyPeriodMsg" class="msg"></div>
+      <div class="small" style="margin-top:6px;">
+        * 시간은 <b>24시간제</b>로 입력됩니다. (예: 09:00 / 14:30)
+      </div>
     </div>
 
     <div class="section">
@@ -159,7 +201,7 @@
   <script type="module">
     import { auth, db } from './firebase-config.js';
     import { signOut } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
-    import { ref, onValue, push, set, update, remove, get, child } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+    import { ref, onValue, push, set, update, get, child } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
     const logoutBtn = document.getElementById('logoutBtn');
     logoutBtn.addEventListener('click', () => {
@@ -172,62 +214,121 @@
       });
     });
 
-    // 신청 기간 설정
-    const applyStartDateEl = document.getElementById('applyStartDate');
-    const applyStartTimeEl = document.getElementById('applyStartTime');
-    const applyEndDateEl = document.getElementById('applyEndDate');
-    const applyEndTimeEl = document.getElementById('applyEndTime');
-    const applyPeriodInfoEl = document.getElementById('applyPeriodInfo');
+    // =========================
+    // 신청기간(무상/유상) 설정
+    // =========================
+    const freeStartDateEl = document.getElementById('freeStartDate');
+    const freeStartTimeEl = document.getElementById('freeStartTime');
+    const freeEndDateEl   = document.getElementById('freeEndDate');
+    const freeEndTimeEl   = document.getElementById('freeEndTime');
+    const paidStartDateEl = document.getElementById('paidStartDate');
+    const paidStartTimeEl = document.getElementById('paidStartTime');
+    const paidEndDateEl   = document.getElementById('paidEndDate');
+    const paidEndTimeEl   = document.getElementById('paidEndTime');
+
+    const freeInfoEl = document.getElementById('freeInfo');
+    const paidInfoEl = document.getElementById('paidInfo');
     const applyPeriodMsgEl = document.getElementById('applyPeriodMsg');
     const saveApplyPeriodBtn = document.getElementById('saveApplyPeriodBtn');
 
     const settingsRef = ref(db, 'settings');
 
-    function parseApplyString(str) {
-      if (!str) return { date: '', time: '' };
-      const [d, t] = str.split(' ');
-      return { date: d || '', time: t || '' };
+    function pad2(n){ return String(n).padStart(2,'0'); }
+
+    // 입력(date,time) -> ms (로컬 타임존 기준)
+    function toMs(dateStr, timeStr, defaultTime) {
+      if (!dateStr) return null;
+      const t = (timeStr && timeStr.trim()) ? timeStr.trim() : (defaultTime || '00:00');
+      const [y,m,d] = dateStr.split('-').map(v=>parseInt(v,10));
+      const [hh,mm] = t.split(':').map(v=>parseInt(v,10));
+      if (!y || !m || !d || isNaN(hh) || isNaN(mm)) return null;
+      return new Date(y, m-1, d, hh, mm, 0, 0).getTime();
+    }
+
+    function msToInputs(ms) {
+      if (!ms || typeof ms !== 'number') return {date:'', time:''};
+      const dt = new Date(ms);
+      const y = dt.getFullYear();
+      const m = pad2(dt.getMonth()+1);
+      const d = pad2(dt.getDate());
+      const hh = pad2(dt.getHours());
+      const mm = pad2(dt.getMinutes());
+      return { date: `${y}-${m}-${d}`, time: `${hh}:${mm}` };
+    }
+
+    function fmt(ms){
+      if (!ms) return '-';
+      const dt = new Date(ms);
+      const y = dt.getFullYear();
+      const m = pad2(dt.getMonth()+1);
+      const d = pad2(dt.getDate());
+      const hh = pad2(dt.getHours());
+      const mm = pad2(dt.getMinutes());
+      return `${y}-${m}-${d} ${hh}:${mm}`;
+    }
+
+    function loadPeriodsToUI(val){
+      const p = (val && val.applyPeriods) ? val.applyPeriods : {};
+      const free = p.free || {};
+      const paid = p.paid || {};
+
+      const fS = msToInputs(free.startMs);
+      const fE = msToInputs(free.endMs);
+      freeStartDateEl.value = fS.date; freeStartTimeEl.value = fS.time;
+      freeEndDateEl.value   = fE.date; freeEndTimeEl.value   = fE.time;
+
+      const pS = msToInputs(paid.startMs);
+      const pE = msToInputs(paid.endMs);
+      paidStartDateEl.value = pS.date; paidStartTimeEl.value = pS.time;
+      paidEndDateEl.value   = pE.date; paidEndTimeEl.value   = pE.time;
+
+      freeInfoEl.textContent = `현재(무상): ${fmt(free.startMs)} ~ ${fmt(free.endMs)}`;
+      paidInfoEl.textContent = `현재(유상): ${fmt(paid.startMs)} ~ ${fmt(paid.endMs)}`;
     }
 
     onValue(settingsRef, (snap) => {
       const val = snap.val() || {};
-      const s = parseApplyString(val.applyStart);
-      const e = parseApplyString(val.applyEnd);
-      applyStartDateEl.value = s.date;
-      applyStartTimeEl.value = s.time || '';
-      applyEndDateEl.value = e.date;
-      applyEndTimeEl.value = e.time || '';
-      if (val.applyStart || val.applyEnd) {
-        applyPeriodInfoEl.textContent = `현재 신청 기간: ${val.applyStart || '-'} ~ ${val.applyEnd || '-'}`;
-      } else {
-        applyPeriodInfoEl.textContent = '현재 설정된 신청 기간이 없습니다.';
-      }
+      loadPeriodsToUI(val);
     });
 
     saveApplyPeriodBtn.addEventListener('click', async () => {
+      applyPeriodMsgEl.classList.remove('msg-error');
       applyPeriodMsgEl.textContent = '';
-      const sd = applyStartDateEl.value;
-      const st = applyStartTimeEl.value || '00:00';
-      const ed = applyEndDateEl.value;
-      const et = applyEndTimeEl.value || '23:59';
 
-      let applyStart = '';
-      let applyEnd = '';
+      const freeStartMs = toMs(freeStartDateEl.value, freeStartTimeEl.value, '00:00');
+      const freeEndMs   = toMs(freeEndDateEl.value,   freeEndTimeEl.value,   '23:59');
+      const paidStartMs = toMs(paidStartDateEl.value, paidStartTimeEl.value, '00:00');
+      const paidEndMs   = toMs(paidEndDateEl.value,   paidEndTimeEl.value,   '23:59');
 
-      if (sd) applyStart = sd + ' ' + st;
-      if (ed) applyEnd = ed + ' ' + et;
+      // 입력했으면 start<=end 검증
+      function validRange(s,e){
+        if (s && e && s > e) return false;
+        return true;
+      }
+      if (!validRange(freeStartMs, freeEndMs) || !validRange(paidStartMs, paidEndMs)) {
+        applyPeriodMsgEl.textContent = '시작일시가 마감일시보다 늦을 수 없습니다.';
+        applyPeriodMsgEl.classList.add('msg-error');
+        return;
+      }
 
       try {
-        await update(settingsRef, { applyStart, applyEnd });
-        applyPeriodMsgEl.textContent = '신청 기간이 저장되었습니다.';
+        await update(settingsRef, {
+          applyPeriods: {
+            free: { startMs: freeStartMs || null, endMs: freeEndMs || null },
+            paid: { startMs: paidStartMs || null, endMs: paidEndMs || null }
+          }
+        });
+        applyPeriodMsgEl.textContent = '무상/유상 신청기간이 저장되었습니다.';
       } catch (e) {
         console.error(e);
-        applyPeriodMsgEl.textContent = '신청 기간 저장 중 오류가 발생했습니다.';
+        applyPeriodMsgEl.textContent = '신청기간 저장 중 오류가 발생했습니다.';
         applyPeriodMsgEl.classList.add('msg-error');
       }
     });
 
-    // 과목 등록 / 수정
+    // =========================
+    // 과목 등록 / 수정 (기존 유지)
+    // =========================
     const cName = document.getElementById('cName');
     const cCategory = document.getElementById('cCategory');
     const cDay = document.getElementById('cDay');
@@ -277,9 +378,7 @@
       courseMsgEl.textContent = '';
     }
 
-    cancelEditBtn.addEventListener('click', () => {
-      exitEditMode();
-    });
+    cancelEditBtn.addEventListener('click', () => exitEditMode());
 
     saveCourseBtn.addEventListener('click', async () => {
       courseMsgEl.textContent = '';
@@ -304,12 +403,8 @@
       }
 
       const courseData = {
-        name,
-        category,
-        day,
-        time,
-        minGrade,
-        maxGrade,
+        name, category, day, time,
+        minGrade, maxGrade,
         teacher,
         capacity: isNaN(capacity) ? 0 : capacity
       };
@@ -335,7 +430,9 @@
       }
     });
 
-    // 과목 목록 & 신청자
+    // =========================
+    // 과목 목록 & 신청자 (기존 유지)
+    // =========================
     const appliedTbody = document.getElementById('appliedTbody');
     const selectedCourseInfoEl = document.getElementById('selectedCourseInfo');
     const downloadExcelBtn = document.getElementById('downloadExcelBtn');
@@ -380,9 +477,7 @@
         await loadAppliedStudents(id);
       } else if (role === 'edit') {
         const snap = await get(child(coursesRef, id));
-        if (snap.exists()) {
-          enterEditMode(id, snap.val());
-        }
+        if (snap.exists()) enterEditMode(id, snap.val());
       } else if (role === 'delete') {
         if (!confirm('정말 이 과목을 삭제하시겠습니까? 관련 신청자 정보도 함께 삭제됩니다.')) return;
         await deleteCourseWithApplied(id);
@@ -426,7 +521,6 @@
       const snap = await get(courseAppliedRef);
       const data = snap.val() || {};
 
-      // appliedByStudent에서 해당 과목 제거
       const updates = {};
       Object.keys(data).forEach(studentKey => {
         updates['appliedByStudent/' + studentKey + '/' + courseId] = null;
@@ -449,6 +543,7 @@
       }
     }
 
+    // 출석부 엑셀 다운로드(기존 유지)
     downloadExcelBtn.addEventListener('click', async () => {
       if (!currentCourseIdForStudents) return;
       try {
@@ -468,9 +563,7 @@
         const daysInMonth = new Date(year, month, 0).getDate();
 
         let header = ['번호','학년','반','이름'];
-        for (let d = 1; d <= daysInMonth; d++) {
-          header.push(`${month}/${d}`);
-        }
+        for (let d = 1; d <= daysInMonth; d++) header.push(`${month}/${d}`);
         header.push('비고');
 
         let rows = [header];

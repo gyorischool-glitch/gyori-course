@@ -25,6 +25,17 @@
     .btn-disabled { background:#9ca3af; color:#fff; cursor:default; }
     .msg { font-size:13px; margin-top:6px; color:#ef4444; }
     .hidden { display:none; }
+    .countdownBox{
+      margin:10px 0 8px;
+      padding:10px 12px;
+      border-radius:10px;
+      background:#eff6ff;
+      border:1px solid #bfdbfe;
+      color:#1e3a8a;
+      font-size:13px;
+      display:none;
+    }
+    .countdownBox b{ font-size:14px; }
     @media (max-width: 768px) {
       .wrap { max-width:100%; margin:0; border-radius:0; box-shadow:none; padding:12px; }
       .topbar { flex-direction:column; align-items:flex-start; gap:6px; }
@@ -41,12 +52,15 @@
       <div class="student" id="studentInfo"></div>
       <button id="logoutBtn" class="logout-btn">로그아웃</button>
     </div>
+
     <div class="tabs">
       <button class="tab-btn active" data-tab="list">프로그램 목록</button>
       <button class="tab-btn" data-tab="mypage">마이페이지</button>
       <button class="tab-btn" data-tab="timetable">시간표 보기</button>
     </div>
+
     <div id="msg" class="msg"></div>
+    <div id="countdownBox" class="countdownBox"></div>
 
     <!-- 프로그램 목록 -->
     <div id="tab-list">
@@ -77,6 +91,7 @@
         </select>
         <input id="filterTeacher" placeholder="강사명" />
       </div>
+
       <table id="courseTable">
         <thead>
           <tr>
@@ -130,9 +145,7 @@
             <th>금</th>
           </tr>
         </thead>
-        <tbody id="timetableBody">
-          <!-- 동적으로 시간대 행을 추가 -->
-        </tbody>
+        <tbody id="timetableBody"></tbody>
       </table>
     </div>
   </div>
@@ -144,6 +157,8 @@
     const studentInfoEl = document.getElementById('studentInfo');
     const logoutBtn = document.getElementById('logoutBtn');
     const msgEl = document.getElementById('msg');
+
+    const countdownBox = document.getElementById('countdownBox');
 
     const tabButtons = document.querySelectorAll('.tab-btn');
     const tabList = document.getElementById('tab-list');
@@ -166,7 +181,33 @@
     let allCourses = {};
     let myApplied = {};
     let settings = {};
+    let serverOffsetMs = 0;
 
+    // =========================
+    // 서버 시간 오프셋(.info/serverTimeOffset)
+    // =========================
+    const offsetRef = ref(db, '.info/serverTimeOffset');
+    onValue(offsetRef, (snap) => {
+      serverOffsetMs = snap.val() || 0;
+      // 서버시간 기준 UI(카운트다운/노출) 재평가
+      renderAll();
+    });
+
+    function nowServerMs() {
+      // Firebase 서버 시간 동기화: 클라 now + 오프셋
+      return Date.now() + (serverOffsetMs || 0);
+    }
+
+    function pad2(n){ return String(n).padStart(2,'0'); }
+    function fmtMs(ms){
+      if (!ms) return '-';
+      const d = new Date(ms);
+      return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    }
+
+    // =========================
+    // 학생 로드/로그아웃/탭
+    // =========================
     function loadStudent() {
       const raw = localStorage.getItem('gyori_student');
       if (!raw) {
@@ -174,11 +215,7 @@
         location.href = 'login.html';
         return;
       }
-      try {
-        student = JSON.parse(raw);
-      } catch (e) {
-        student = null;
-      }
+      try { student = JSON.parse(raw); } catch { student = null; }
       if (!student || !student.name || !student.grade || !student.class) {
         alert('학생 정보가 없습니다. 다시 로그인 해 주세요.');
         location.href = 'login.html';
@@ -202,27 +239,121 @@
         tabList.classList.toggle('hidden', t !== 'list');
         tabMy.classList.toggle('hidden', t !== 'mypage');
         tabTime.classList.toggle('hidden', t !== 'timetable');
+
+        // 탭 변경 시에도 “목록 숨김 규칙”을 즉시 반영
+        if (t === 'list') applyListVisibilityRules();
       });
     });
 
-    function parseTimeRange(timeStr) {
-      if (!timeStr) return null;
-      const m = timeStr.match(/(\d{1,2}):(\d{2})\s*~\s*(\d{1,2}):(\d{2})/);
-      if (!m) return null;
-      const sh = parseInt(m[1], 10);
-      const sm = parseInt(m[2], 10);
-      const eh = parseInt(m[3], 10);
-      const em = parseInt(m[4], 10);
-      const start = sh * 60 + sm;
-      const end = eh * 60 + em;
-      if (isNaN(start) || isNaN(end) || end <= start) return null;
-      return { start, end };
+    // =========================
+    // 기간 로직(무상/유상)
+    // settings.applyPeriods.free|paid.startMs/endMs 사용
+    // =========================
+    function normalizeCategory(cat){
+      const s = (cat || '').trim();
+      if (s.includes('무상')) return 'free';
+      if (s.includes('유상')) return 'paid';
+      // 기타는 paid로 취급(원하시면 free/paid/기타 정책 바꿔드릴 수 있어요)
+      return 'paid';
     }
 
-    function minutesToFreeHours(minutes) {
-      return Math.ceil(minutes / 40);
+    function getPeriods(){
+      const p = (settings && settings.applyPeriods) ? settings.applyPeriods : {};
+      const free = p.free || {};
+      const paid = p.paid || {};
+      return {
+        free: { startMs: free.startMs || null, endMs: free.endMs || null },
+        paid: { startMs: paid.startMs || null, endMs: paid.endMs || null },
+      };
     }
 
+    function within(msNow, startMs, endMs){
+      if (startMs && msNow < startMs) return false;
+      if (endMs && msNow > endMs) return false;
+      // start/end 둘 다 비어있으면 “기간 미설정” → 목록 숨김(보수적으로)
+      if (!startMs && !endMs) return false;
+      return true;
+    }
+
+    function canShowAnyList(msNow){
+      const {free, paid} = getPeriods();
+      return within(msNow, free.startMs, free.endMs) || within(msNow, paid.startMs, paid.endMs);
+    }
+
+    function canShowCourse(msNow, course){
+      const type = normalizeCategory(course.category);
+      const {free, paid} = getPeriods();
+      const p = (type === 'free') ? free : paid;
+      return within(msNow, p.startMs, p.endMs);
+    }
+
+    // =========================
+    // 신청 시작 3분 전 카운트다운 + 0초 1회 새로고침
+    // =========================
+    let countdownTimer = null;
+
+    function startCountdownIfNeeded(){
+      if (countdownTimer) clearInterval(countdownTimer);
+      countdownTimer = null;
+
+      const now = nowServerMs();
+      const {free, paid} = getPeriods();
+
+      const candidates = [free.startMs, paid.startMs].filter(v => typeof v === 'number' && v);
+      if (!candidates.length) {
+        countdownBox.style.display = 'none';
+        countdownBox.textContent = '';
+        return;
+      }
+
+      const nextStart = Math.min(...candidates.filter(s => s > now));
+      if (!nextStart || !isFinite(nextStart)) {
+        countdownBox.style.display = 'none';
+        countdownBox.textContent = '';
+        return;
+      }
+
+      const diff = nextStart - now;
+      if (diff > 3 * 60 * 1000) {
+        countdownBox.style.display = 'none';
+        countdownBox.textContent = '';
+        return;
+      }
+
+      // 3분 이내면 카운트다운 표시
+      countdownBox.style.display = 'block';
+
+      const refreshKey = `gyori_autorefresh_done_${nextStart}`;
+
+      const tick = () => {
+        const now2 = nowServerMs();
+        const left = Math.max(0, nextStart - now2);
+
+        const sec = Math.floor(left / 1000);
+        const mm = Math.floor(sec / 60);
+        const ss = sec % 60;
+
+        countdownBox.innerHTML =
+          `수강신청 시작까지 <b>${mm}분 ${pad2(ss)}초</b> 남았습니다. (서버시간 기준)<br>` +
+          `<span style="font-size:12px; color:#1f2937;">시작 예정: ${fmtMs(nextStart)}</span>`;
+
+        if (left <= 0) {
+          // 0초 도달 → 자동 새로고침 1회
+          if (!localStorage.getItem(refreshKey)) {
+            localStorage.setItem(refreshKey, '1');
+            location.reload();
+            return;
+          }
+        }
+      };
+
+      tick();
+      countdownTimer = setInterval(tick, 1000);
+    }
+
+    // =========================
+    // 데이터 로드
+    // =========================
     function loadData() {
       const coursesRef = ref(db, 'courses');
       const myRef = ref(db, 'appliedByStudent/' + studentKey);
@@ -241,9 +372,16 @@
 
       onValue(settingsRef, (snap) => {
         settings = snap.val() || {};
+        // 설정 변경 시 “목록 숨김/카운트다운” 즉시 갱신
+        applyListVisibilityRules();
+        startCountdownIfNeeded();
+        renderAll();
       });
     }
 
+    // =========================
+    // 필터/렌더
+    // =========================
     function updateFilters() {
       const cats = new Set();
       const names = new Set();
@@ -274,13 +412,41 @@
     }
 
     function renderAll() {
-      renderList();
       renderMyPage();
       renderTimetable();
+      renderList();
+      // 리스트 탭이 열려 있을 때만 “숨김 규칙” 적용(UX)
+      applyListVisibilityRules();
+      startCountdownIfNeeded();
+    }
+
+    // ✅ 요구사항: 신청기간 외에는 “과목 목록이 아예 안 보임”
+    // ✅ 마감 후에도 마이/시간표는 계속 보임
+    function applyListVisibilityRules(){
+      const activeTab = document.querySelector('.tab-btn.active')?.dataset?.tab;
+      if (activeTab !== 'list') return;
+
+      const now = nowServerMs();
+      const showAny = canShowAnyList(now);
+
+      if (!showAny) {
+        // 목록 탭 자체는 두되, 내부(필터/테이블) 완전 숨김
+        tabList.style.display = 'none';
+        msgEl.textContent = '현재 수강신청 기간이 아닙니다.';
+        // countdownBox는 3분 전일 수 있으니, 이 경우엔 countdownBox는 보여줄 수 있음
+      } else {
+        tabList.style.display = '';
+        msgEl.textContent = '';
+      }
     }
 
     function renderList() {
       tbodyList.innerHTML = '';
+
+      const now = nowServerMs();
+      // 기간이 아니면 렌더 자체를 하지 않음(완전 숨김은 applyListVisibilityRules에서 처리)
+      if (!canShowAnyList(now)) return;
+
       const entries = Object.entries(allCourses);
       if (!entries.length) {
         const tr = document.createElement('tr');
@@ -288,8 +454,16 @@
         tbodyList.appendChild(tr);
         return;
       }
+
+      let rendered = 0;
+
       entries.forEach(([id, c]) => {
+        // ✅ 과목별로(무상/유상) 해당 기간에만 노출
+        if (!canShowCourse(now, c)) return;
         if (!courseMatchesFilters(c)) return;
+
+        rendered++;
+
         const tr = document.createElement('tr');
         const range = (c.minGrade || c.maxGrade) ? `${c.minGrade || ''}~${c.maxGrade || ''}학년` : '';
         const cap = c.capacity || 0;
@@ -312,12 +486,7 @@
             btnClass = 'btn-cancel';
           }
         } else {
-          if (settings && !isWithinApplyPeriod()) {
-            statusText = '신청 기간 아님';
-            btnLabel = '신청 불가';
-            btnClass = 'btn-disabled';
-            disabled = true;
-          } else if (cap && appliedCount >= cap) {
+          if (cap && appliedCount >= cap) {
             statusText = '정원 마감 (대기 가능)';
             btnLabel = '대기 신청';
             btnClass = 'btn-apply';
@@ -340,18 +509,21 @@
           <td>${statusText}</td>
           <td><button class="${btnClass}" data-id="${id}" ${disabled ? 'disabled' : ''}>${btnLabel}</button></td>
         `;
+
         const btn = tr.querySelector('button');
-        if (!disabled) {
-          btn.addEventListener('click', () => {
-            if (my) {
-              cancelCourse(id, my);
-            } else {
-              applyCourse(id, cap && appliedCount >= cap);
-            }
-          });
-        }
+        btn.addEventListener('click', () => {
+          if (my) cancelCourse(id, my);
+          else applyCourse(id, cap && appliedCount >= cap);
+        });
+
         tbodyList.appendChild(tr);
       });
+
+      if (rendered === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="10">현재 조건에서 표시할 과목이 없습니다.</td>';
+        tbodyList.appendChild(tr);
+      }
     }
 
     function renderMyPage() {
@@ -385,8 +557,26 @@
       });
     }
 
+    function parseTimeRange(timeStr) {
+      if (!timeStr) return null;
+      const m = timeStr.match(/(\d{1,2}):(\d{2})\s*~\s*(\d{1,2}):(\d{2})/);
+      if (!m) return null;
+      const sh = parseInt(m[1], 10);
+      const sm = parseInt(m[2], 10);
+      const eh = parseInt(m[3], 10);
+      const em = parseInt(m[4], 10);
+      const start = sh * 60 + sm;
+      const end = eh * 60 + em;
+      if (isNaN(start) || isNaN(end) || end <= start) return null;
+      return { start, end };
+    }
+
+    function minutesToFreeHours(minutes) {
+      // 무상 10시간 제한: 40분 = 1시간
+      return Math.ceil(minutes / 40);
+    }
+
     function buildTimetableSlots() {
-      // 13:00~13:40 / 13:40~14:20 / 14:20~15:00 등 40분 단위 예시
       timetableBody.innerHTML = '';
       const baseTimes = [
         '13:00~13:40',
@@ -396,10 +586,7 @@
       ];
       baseTimes.forEach(t => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${t}</td>
-          <td></td><td></td><td></td><td></td><td></td>
-        `;
+        tr.innerHTML = `<td>${t}</td><td></td><td></td><td></td><td></td><td></td>`;
         timetableBody.appendChild(tr);
       });
     }
@@ -415,7 +602,7 @@
         if (!t) return;
         const col = dayIndex[c.day];
         if (!col) return;
-        // 단순히 시작 시간이 같은 슬롯에 표시
+
         for (let row of timetableBody.rows) {
           const slotStr = row.cells[0].textContent;
           const slot = parseTimeRange(slotStr);
@@ -428,43 +615,29 @@
       });
     }
 
-    function parseApplyDateTime(str) {
-      if (!str) return null;
-      const [d, t] = str.split(' ');
-      if (!d || !t) return null;
-      const [y, m, day] = d.split('-').map(v => parseInt(v,10));
-      const [hh, mm] = t.split(':').map(v => parseInt(v,10));
-      if (!y || !m || !day || isNaN(hh) || isNaN(mm)) return null;
-      return new Date(y, m-1, day, hh, mm);
-    }
-
-    function isWithinApplyPeriod() {
-      const s = parseApplyDateTime(settings.applyStart);
-      const e = parseApplyDateTime(settings.applyEnd);
-      const now = new Date();
-      if (s && now < s) return false;
-      if (e && now > e) return false;
-      return true;
+    // =========================
+    // 신청/취소 로직(기존 유지 + 기간/서버시간 기준 강화)
+    // =========================
+    function isCourseApplyAllowedNow(course){
+      const now = nowServerMs();
+      return canShowCourse(now, course); // 무상/유상 기간에 따라 제한
     }
 
     async function applyCourse(courseId, asWait) {
       msgEl.textContent = '';
       const course = allCourses[courseId];
-      if (!course) {
-        msgEl.textContent = '과목 정보를 찾을 수 없습니다.';
-        return;
-      }
-      if (!isWithinApplyPeriod()) {
+      if (!course) { msgEl.textContent = '과목 정보를 찾을 수 없습니다.'; return; }
+
+      // ✅ 서버시간 기준 신청기간 체크
+      if (!isCourseApplyAllowedNow(course)) {
         msgEl.textContent = '현재는 신청 기간이 아닙니다.';
         return;
       }
 
-      // 시간 겹침 체크 (신청 완료 및 대기 포함)
+      // 시간 겹침 체크(기존 유지)
       const newTime = parseTimeRange(course.time || '');
-      if (!newTime) {
-        msgEl.textContent = '과목 시간 정보가 올바르지 않습니다.';
-        return;
-      }
+      if (!newTime) { msgEl.textContent = '과목 시간 정보가 올바르지 않습니다.'; return; }
+
       for (const [id, my] of Object.entries(myApplied)) {
         const c = allCourses[id];
         if (!c) continue;
@@ -479,21 +652,20 @@
         }
       }
 
-      // 무상 10시간 제한 (OK 상태만 합산)
-      if (course.category === '무상') {
+      // 무상 10시간 제한(기존 유지)
+      if ((course.category || '').includes('무상')) {
         let totalMinutes = 0;
         for (const [id, my] of Object.entries(myApplied)) {
           if (my.status !== 'OK') continue;
           const c = allCourses[id];
-          if (!c || c.category !== '무상') continue;
+          if (!c || !(c.category || '').includes('무상')) continue;
           const t = parseTimeRange(c.time || '');
           if (!t) continue;
           totalMinutes += (t.end - t.start);
         }
         const tNew = parseTimeRange(course.time || '');
-        if (tNew) {
-          totalMinutes += (tNew.end - tNew.start);
-        }
+        if (tNew) totalMinutes += (tNew.end - tNew.start);
+
         const hours = minutesToFreeHours(totalMinutes);
         if (hours > 10) {
           msgEl.textContent = '무상 프로그램은 주 10시간까지만 신청할 수 있습니다.';
@@ -511,43 +683,39 @@
           const cap = cur.capacity || 0;
           const appliedCount = cur.appliedCount || 0;
           const waitCount = cur.waitCount || 0;
+
           if (!asWait) {
             if (cap && appliedCount >= cap) {
-              // 정원 가득 → 대기로 전환
               cur.waitCount = waitCount + 1;
-              cur.appliedCount = appliedCount;
               cur._applyStatus = 'WAIT';
             } else {
               cur.appliedCount = appliedCount + 1;
-              cur.waitCount = waitCount;
               cur._applyStatus = 'OK';
             }
           } else {
-            // 강제로 대기 신청
             cur.waitCount = waitCount + 1;
             cur._applyStatus = 'WAIT';
           }
           return cur;
         }).then(async (res) => {
-          const committed = res.committed;
           const val = res.snapshot.val();
-          if (!committed || !val) {
-            msgEl.textContent = '신청 처리 중 문제가 발생했습니다.';
-            return;
-          }
+          if (!val) { msgEl.textContent = '신청 처리 중 문제가 발생했습니다.'; return; }
           const status = val._applyStatus || 'OK';
           delete val._applyStatus;
+
           const payload = {
             grade: student.grade,
             class: student.class,
             name: student.name,
             status,
-            ts: Date.now()
+            ts: nowServerMs()
           };
+
           await Promise.all([
             set(appliedByStudentRef, payload),
             set(appliedListRef, payload)
           ]);
+
           msgEl.textContent = status === 'WAIT' ? '대기 신청이 완료되었습니다.' : '신청이 완료되었습니다.';
         });
       } catch (e) {
@@ -556,9 +724,11 @@
       }
     }
 
+    // ✅ 요구사항: 취소 시 대기 1번 자동 승격 안 함 → 이 cancelCourse는 승격 로직이 전혀 없음(그대로 유지)
     async function cancelCourse(courseId, myInfo) {
       if (!confirm('이 과목 신청을 취소하시겠습니까?')) return;
       msgEl.textContent = '';
+
       const courseRef = ref(db, 'courses/' + courseId);
       const appliedByStudentRef = ref(db, 'appliedByStudent/' + studentKey + '/' + courseId);
       const appliedListRef = ref(db, 'courseApplied/' + courseId + '/' + studentKey);
@@ -568,17 +738,14 @@
           if (!cur) return cur;
           const appliedCount = cur.appliedCount || 0;
           const waitCount = cur.waitCount || 0;
-          if (myInfo.status === 'WAIT') {
-            cur.waitCount = waitCount > 0 ? waitCount - 1 : 0;
-          } else {
-            cur.appliedCount = appliedCount > 0 ? appliedCount - 1 : 0;
-          }
+
+          if (myInfo.status === 'WAIT') cur.waitCount = waitCount > 0 ? waitCount - 1 : 0;
+          else cur.appliedCount = appliedCount > 0 ? appliedCount - 1 : 0;
+
           return cur;
         });
-        await Promise.all([
-          remove(appliedByStudentRef),
-          remove(appliedListRef)
-        ]);
+
+        await Promise.all([ remove(appliedByStudentRef), remove(appliedListRef) ]);
         msgEl.textContent = '신청이 취소되었습니다.';
       } catch (e) {
         console.error(e);
@@ -586,10 +753,9 @@
       }
     }
 
+    // 초기 실행
     loadStudent();
-    if (student) {
-      loadData();
-    }
+    if (student) loadData();
   </script>
 </body>
 </html>
